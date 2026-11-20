@@ -177,7 +177,7 @@ function buildInvoiceA5Html(inv, cfg = DEFAULT_INVOICE_CONFIG, excludeList = [])
     <div style="text-align:center;font-size:${c.fontSize - 1}px;margin-bottom:6px">Số HĐ: <b>${inv.id}</b> — Ngày: ${inv.date || ""}</div>
     <div style="margin-bottom:6px;line-height:1.4">
       <div>Khách hàng: <b>${inv.customerName}</b> — SĐT: ${inv.phone || ""}</div>
-      <div>Địa chỉ: ${inv.address || ""} | Sale: <b>${inv.saleName}</b></div>
+      <div>Địa chỉ: ${inv.address || ""} | Sale: <b>${inv.saleName || ""}</b></div>
     </div>
     <table><thead><tr><th width="26">STT</th><th>${c.colName}</th><th width="36">${c.colQty}</th><th width="68">${c.colPrice}</th><th width="78">${c.colTotal}</th></tr></thead><tbody>${rowsHtml}</tbody></table>
     <div class="sum">
@@ -188,6 +188,7 @@ function buildInvoiceA5Html(inv, cfg = DEFAULT_INVOICE_CONFIG, excludeList = [])
       <div style="border-top:1px solid #333;margin-top:3px;padding-top:3px;font-size:${c.fontSize + 2}px;color:${c.headerColor}"><span>TỔNG CỘNG TOA:</span><b>${formatMoney(finalTot)} đ</b></div>
     </div>
     <div style="clear:both"></div>
+    ${inv.adminNote ? `<div style="margin-top:8px;padding:6px;border:1px dashed #666;font-size:${c.fontSize - 1}px"><b>Ghi chú:</b> ${inv.adminNote}</div>` : ""}
     <div style="font-style:italic;font-size:${c.fontSize - 2}px;margin-top:8px">${c.footerNote}</div>
     <div style="display:flex;justify-content:space-between;text-align:center;margin-top:16px">
       <div><b>Người lập phiếu</b><br><i style="font-size:10px">(Ký, ghi rõ họ tên)</i></div>
