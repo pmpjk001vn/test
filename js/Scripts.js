@@ -1241,8 +1241,11 @@ function loadHist(){
     
     renderAllHistoryPages();
     histUpdateAllBtns(false);
-    // Chế độ "tất cả" thì tự làm mới thưa hơn (30s) để khỏi tải lại cả đống dữ liệu mỗi 10s
-    autoReloadTimer=setTimeout(loadHist, reqAll ? 30000 : 10000);
+  
+    // Khi đang xem "Hiện tất cả" (3.000+ đơn), KHÔNG tự tải lại toàn bộ mỗi 30s để tránh giật lag
+if (!reqAll) {
+  autoReloadTimer = setTimeout(loadHist, 15000);
+}
   }).withFailureHandler(err=>{
     if (reqAll !== histLoadAll) return;
     // Chỉ báo lỗi + trả chế độ về như cũ khi lỗi xảy ra do người dùng vừa bấm nút
