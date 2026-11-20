@@ -1,9 +1,10 @@
 const HIST_UI = {
   search: "",
-  dateFilter: "all",
+  dateFilter: "today",
   fromDate: "",
   toDate: "",
   statusFilter: "all",
+  scopeFilter: "all", // "all" | "mine"
   procSearch: "",
   procFilter: "all"
 };
@@ -14,83 +15,176 @@ function renderHistoryAndProcessTab(container, tab) {
   return renderCompletedInvoicesView(container);
 }
 
+function getDateFilterLabel(key) {
+  const map = {
+    today: "Hôm nay",
+    yesterday: "Hôm qua",
+    "7days": "7 ngày qua",
+    thisMonth: "Tháng này",
+    all: "Tất cả",
+    custom: "Tùy chọn"
+  };
+  return map[key] || "Tất cả";
+}
+
 function renderOrderManagementView(container) {
-  const isAdmin = APP_STATE.user.role === "Admin" || APP_STATE.user.role === "SAdmin";
-  const rows = (APP_STATE.histories.hoaDon || []).filter(h => {
+  const currentUserName = APP_STATE.user?.fullName || "";
+  const q = bodau(HIST_UI.search);
+
+  // Lọc theo phạm vi (Tất cả / Cá nhân), thời gian và từ khóa tìm kiếm trước để tính số liệu 4 hộp thống kê
+  const baseRows = (APP_STATE.histories.hoaDon || []).filter(h => {
+    if (HIST_UI.scopeFilter === "mine" && h.saleName !== currentUserName) return false;
     if (!isDateInRange(h.date, HIST_UI.dateFilter, HIST_UI.fromDate, HIST_UI.toDate)) return false;
-    if (HIST_UI.statusFilter !== "all" && h.status !== HIST_UI.statusFilter) return false;
-    const q = bodau(HIST_UI.search);
     if (!q) return true;
     return bodau(h.id).includes(q) || bodau(h.customerName).includes(q) || bodau(h.saleName).includes(q);
   });
 
-  container.innerHTML = `<div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-      <h2 style="margin:0;color:var(--blue)">Quản Lý Đơn Hàng (${rows.length})</h2>
-      <button type="button" id="btn-load-all-hist" class="btn btn-outline btn-sm">Tải toàn bộ lịch sử</button>
+  const totalRevenue = baseRows.reduce((s, h) => s + Number(h.totalAmount || 0), 0);
+  const totalOrders = baseRows.length;
+  const waitingPrintCount = baseRows.filter(h => h.status !== "Đã in").length;
+  const printedCount = baseRows.filter(h => h.status === "Đã in").length;
+
+  // Lọc tiếp theo trạng thái khi bấm vào các hộp thống kê
+  const rows = baseRows.filter(h => {
+    if (HIST_UI.statusFilter === "Chờ in") return h.status !== "Đã in";
+    if (HIST_UI.statusFilter === "Đã in") return h.status === "Đã in";
+    return true;
+  });
+
+  const dateBtns = [
+    { id: "today", label: "Hôm nay" },
+    { id: "yesterday", label: "Hôm qua" },
+    { id: "7days", label: "7 ngày" },
+    { id: "thisMonth", label: "Tháng này" },
+    { id: "all", label: "Tất cả" },
+    { id: "custom", label: "Tùy chọn" }
+  ];
+
+  container.innerHTML = `
+    <div style="margin-bottom:10px">
+      <button type="button" id="btn-hist-back" class="btn btn-outline btn-sm" style="border-radius:999px">← Quay lại</button>
     </div>
 
     <div class="grid-2" style="margin-bottom:12px">
-      <input id="hist-search" type="text" class="input" value="${HIST_UI.search}" placeholder="Tìm mã HĐ, khách hàng, Sale..." />
-      <select id="hist-status" class="input">
-        <option value="all" ${HIST_UI.statusFilter === "all" ? "selected" : ""}>Tất cả trạng thái</option>
-        <option value="Chờ in" ${HIST_UI.statusFilter === "Chờ in" ? "selected" : ""}>Chờ in</option>
-        <option value="Đã in" ${HIST_UI.statusFilter === "Đã in" ? "selected" : ""}>Đã in</option>
-      </select>
-      <select id="hist-date" class="input">
-        <option value="all" ${HIST_UI.dateFilter === "all" ? "selected" : ""}>Mọi thời gian</option>
-        <option value="today" ${HIST_UI.dateFilter === "today" ? "selected" : ""}>Hôm nay</option>
-        <option value="yesterday" ${HIST_UI.dateFilter === "yesterday" ? "selected" : ""}>Hôm qua</option>
-        <option value="7days" ${HIST_UI.dateFilter === "7days" ? "selected" : ""}>7 ngày qua</option>
-        <option value="thisMonth" ${HIST_UI.dateFilter === "thisMonth" ? "selected" : ""}>Tháng này</option>
-        <option value="custom" ${HIST_UI.dateFilter === "custom" ? "selected" : ""}>Tùy chọn ngày</option>
-      </select>
-      ${HIST_UI.dateFilter === "custom" ? `<div style="display:flex;gap:6px">
-        <input id="hist-from" type="date" class="input" value="${HIST_UI.fromDate}" />
-        <input id="hist-to" type="date" class="input" value="${HIST_UI.toDate}" />
+      <div class="stat-card" id="stat-rev" style="cursor:default">
+        <div class="muted" style="font-size:12px;font-weight:700">DOANH THU</div>
+        <div class="stat-val" style="color:var(--blue);font-size:20px">${formatMoney(totalRevenue)}đ</div>
+        <div class="muted" style="font-size:12px">${getDateFilterLabel(HIST_UI.dateFilter)}</div>
+      </div>
+
+      <div class="stat-card" id="stat-all" style="border-bottom:3px solid ${HIST_UI.statusFilter === "all" ? "var(--red)" : "transparent"}">
+        <div class="muted" style="font-size:12px;font-weight:700">TỔNG ĐƠN</div>
+        <div class="stat-val" style="color:var(--red);font-size:20px">${totalOrders}</div>
+        <div class="muted" style="font-size:12px">phiếu</div>
+      </div>
+
+      <div class="stat-card" id="stat-wait" style="border-bottom:3px solid ${HIST_UI.statusFilter === "Chờ in" ? "var(--amber)" : "transparent"}">
+        <div class="muted" style="font-size:12px;font-weight:700">CHỜ IN</div>
+        <div class="stat-val" style="color:var(--amber);font-size:20px">${waitingPrintCount}</div>
+        <div class="muted" style="font-size:12px">phiếu</div>
+      </div>
+
+      <div class="stat-card" id="stat-printed" style="border-bottom:3px solid ${HIST_UI.statusFilter === "Đã in" ? "var(--green)" : "transparent"}">
+        <div class="muted" style="font-size:12px;font-weight:700">ĐÃ IN</div>
+        <div class="stat-val" style="color:var(--green);font-size:20px">${printedCount}</div>
+        <div class="muted" style="font-size:12px">phiếu</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;color:var(--blue)">
+          <input type="radio" name="hist-scope" value="all" ${HIST_UI.scopeFilter === "all" ? "checked" : ""} />
+          <span>Tất cả đơn</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;color:var(--green)">
+          <input type="radio" name="hist-scope" value="mine" ${HIST_UI.scopeFilter === "mine" ? "checked" : ""} />
+          <span>Đơn cá nhân</span>
+        </label>
+      </div>
+
+      <input id="hist-search" type="text" class="input" value="${HIST_UI.search.replace(/"/g, "&quot;")}"
+        placeholder="Tìm nhanh tên khách hàng, mã HĐ, Sale..." style="margin-bottom:12px" />
+
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+        <span class="muted" style="font-size:12px;font-weight:700;margin-right:4px">KHOẢNG THỜI GIAN:</span>
+        ${dateBtns.map(b => `
+          <button type="button" class="btn btn-sm hist-date-btn ${HIST_UI.dateFilter === b.id ? "btn-primary" : "btn-outline"}" data-date="${b.id}">
+            ${b.label}
+          </button>
+        `).join("")}
+        <button type="button" id="btn-load-all-hist" class="btn btn-outline btn-sm">👁 Hiện tất cả</button>
+      </div>
+
+      ${HIST_UI.dateFilter === "custom" ? `<div class="grid-2" style="margin-bottom:12px">
+        <div><label class="muted">Từ ngày</label><input id="hist-from" type="date" class="input" value="${HIST_UI.fromDate}" /></div>
+        <div><label class="muted">Đến ngày</label><input id="hist-to" type="date" class="input" value="${HIST_UI.toDate}" /></div>
       </div>` : ""}
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Mã HĐ</th><th>Ngày</th><th>Khách hàng</th><th>Sale</th><th class="text-right">Tổng tiền</th><th>Trạng thái</th><th>Thao tác</th>
+          </tr></thead>
+          <tbody>
+            ${rows.length === 0 ? `<tr><td colspan="7" class="text-center muted" style="padding:20px">Không có đơn hàng nào phù hợp bộ lọc</td></tr>` :
+              rows.map((h, i) => `<tr>
+                <td><b>${h.id || "---"}</b></td>
+                <td>${h.date || "---"}</td>
+                <td><b>${h.customerName}</b></td>
+                <td>${h.saleName || "---"}</td>
+                <td class="text-right"><b>${formatMoney(h.totalAmount)} đ</b></td>
+                <td><span class="badge ${h.status === "Đã in" ? "red" : ""}">${h.status || "Chờ in"}</span></td>
+                <td style="white-space:nowrap">
+                  <button type="button" class="btn btn-outline btn-sm hist-print" data-i="${i}">In A5</button>
+                  <button type="button" class="btn btn-primary btn-sm hist-edit" data-i="${i}">Sửa</button>
+                  <button type="button" class="btn btn-danger btn-sm hist-del" data-id="${h.id}">Xóa</button>
+                </td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
     </div>
+  `;
 
-    <div class="table-wrap">
-      <table>
-        <thead><tr>
-          <th>Mã HĐ</th><th>Ngày</th><th>Khách hàng</th><th>Sale</th><th class="text-right">Tổng tiền</th><th>Trạng thái</th><th>Thao tác</th>
-        </tr></thead>
-        <tbody>
-          ${rows.map((h, i) => `<tr>
-            <td><b>${h.id}</b></td>
-            <td>${h.date}</td>
-            <td><b>${h.customerName}</b></td>
-            <td>${isAdmin ? `<select class="input hist-sale-sel" data-id="${h.id}" style="padding:4px 6px;font-size:13px">
-              ${APP_STATE.data.staffs.map(s => `<option value="${s.fullName}" ${s.fullName === h.saleName ? "selected" : ""}>${s.fullName}</option>`).join("")}
-            </select>` : h.saleName}</td>
-            <td class="text-right"><b>${formatMoney(h.totalAmount)} đ</b></td>
-            <td><span class="badge ${h.status === "Đã in" ? "red" : ""}">${h.status || "Chờ in"}</span></td>
-            <td style="white-space:nowrap">
-              <button type="button" class="btn btn-outline btn-sm hist-print" data-i="${i}">In A5</button>
-              <button type="button" class="btn btn-primary btn-sm hist-edit" data-i="${i}">Sửa</button>
-              <button type="button" class="btn btn-danger btn-sm hist-del" data-id="${h.id}">Xóa</button>
-            </td>
-          </tr>`).join("")}
-        </tbody>
-      </table>
-    </div>
-  </div>`;
+  document.getElementById("btn-hist-back").onclick = () => switchTab("order");
+  document.getElementById("stat-all").onclick = () => { HIST_UI.statusFilter = "all"; renderOrderManagementView(container); };
+  document.getElementById("stat-wait").onclick = () => { HIST_UI.statusFilter = "Chờ in"; renderOrderManagementView(container); };
+  document.getElementById("stat-printed").onclick = () => { HIST_UI.statusFilter = "Đã in"; renderOrderManagementView(container); };
 
-  document.getElementById("btn-load-all-hist").onclick = () => syncAllData(true);
-  document.getElementById("hist-search").oninput = (e) => { HIST_UI.search = e.target.value; renderOrderManagementView(container); };
-  document.getElementById("hist-status").onchange = (e) => { HIST_UI.statusFilter = e.target.value; renderOrderManagementView(container); };
-  document.getElementById("hist-date").onchange = (e) => { HIST_UI.dateFilter = e.target.value; renderOrderManagementView(container); };
-  if (document.getElementById("hist-from")) document.getElementById("hist-from").onchange = (e) => { HIST_UI.fromDate = e.target.value; renderOrderManagementView(container); };
-  if (document.getElementById("hist-to")) document.getElementById("hist-to").onchange = (e) => { HIST_UI.toDate = e.target.value; renderOrderManagementView(container); };
-
-  document.querySelectorAll(".hist-sale-sel").forEach(sel => {
-    sel.onchange = async () => {
-      await callApi("quickUpdateOrderSale", [sel.getAttribute("data-id"), sel.value]);
-      Swal.fire({ toast: true, position: "top-end", icon: "success", title: "Đã đổi Sale", timer: 1200, showConfirmButton: false });
-      syncAllData(false);
+  document.querySelectorAll('input[name="hist-scope"]').forEach(r => {
+    r.onchange = (e) => {
+      HIST_UI.scopeFilter = e.target.value;
+      renderOrderManagementView(container);
     };
   });
+
+  document.getElementById("hist-search").oninput = (e) => {
+    HIST_UI.search = e.target.value;
+    renderOrderManagementView(container);
+    const inp = document.getElementById("hist-search");
+    if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+  };
+
+  document.querySelectorAll(".hist-date-btn").forEach(btn => {
+    btn.onclick = () => {
+      HIST_UI.dateFilter = btn.getAttribute("data-date");
+      renderOrderManagementView(container);
+    };
+  });
+
+  document.getElementById("btn-load-all-hist").onclick = () => {
+    HIST_UI.dateFilter = "all";
+    HIST_UI.statusFilter = "all";
+    syncAllData(true);
+  };
+
+  if (document.getElementById("hist-from")) {
+    document.getElementById("hist-from").onchange = (e) => { HIST_UI.fromDate = e.target.value; renderOrderManagementView(container); };
+  }
+  if (document.getElementById("hist-to")) {
+    document.getElementById("hist-to").onchange = (e) => { HIST_UI.toDate = e.target.value; renderOrderManagementView(container); };
+  }
 
   document.querySelectorAll(".hist-print").forEach(btn => {
     btn.onclick = async () => {
