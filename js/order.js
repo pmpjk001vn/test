@@ -1,5 +1,6 @@
 const ORDER_UI = {
   saleName: "",
+  saleInitialized: false,
   customer: null,
   custQuery: "",
   showCustList: false,
@@ -13,7 +14,10 @@ const ORDER_UI = {
 
 function renderOrderOrDraftTab(container, tab) {
   const u = APP_STATE.user;
-  if (!ORDER_UI.saleName) ORDER_UI.saleName = u.fullName;
+  if (!ORDER_UI.saleInitialized) {
+    ORDER_UI.saleName = u.role === "Sale" ? u.fullName : "";
+    ORDER_UI.saleInitialized = true;
+  }
 
   if (APP_STATE.editingOrder) {
     const ed = APP_STATE.editingOrder;
@@ -26,7 +30,7 @@ function renderOrderOrDraftTab(container, tab) {
     };
     ORDER_UI.custQuery = ORDER_UI.customer.name;
     ORDER_UI.cart = (ed.items || []).map(it => Object.assign({}, it));
-    if (ed.saleName) ORDER_UI.saleName = ed.saleName;
+    ORDER_UI.saleName = ed.saleName || "";
     if (ed.isDraft) {
       ORDER_UI.draftId = ed.draftId || ed.id;
       ORDER_UI.orderId = null;
@@ -46,17 +50,23 @@ function renderOrderOrDraftTab(container, tab) {
 
 function renderOrderView(container) {
   const isAdmin = APP_STATE.user.role === "Admin" || APP_STATE.user.role === "SAdmin";
-  const saleObj = APP_STATE.data.staffs.find(s => s.fullName === ORDER_UI.saleName);
+  const saleObj = ORDER_UI.saleName
+    ? APP_STATE.data.staffs.find(s => s.fullName === ORDER_UI.saleName)
+    : null;
 
   const qCust = bodau(ORDER_UI.custQuery);
   const custMatches = !qCust
-    ? APP_STATE.data.customers.slice(0, 20)
-    : APP_STATE.data.customers.filter(c => bodau(c.name).includes(qCust) || bodau(c.phone).includes(qCust)).slice(0, 25);
+    ? APP_STATE.data.customers.slice(0, 25)
+    : APP_STATE.data.customers
+        .filter(c => bodau(c.name).includes(qCust) || bodau(c.phone).includes(qCust))
+        .slice(0, 30);
 
   const qProd = bodau(ORDER_UI.prodQuery);
   const prodMatches = !qProd
     ? []
-    : APP_STATE.data.products.filter(p => bodau(p.name).includes(qProd) || bodau(p.code).includes(qProd)).slice(0, 40);
+    : APP_STATE.data.products
+        .filter(p => bodau(p.name).includes(qProd) || bodau(p.code).includes(qProd))
+        .slice(0, 40);
 
   const totalCart = ORDER_UI.cart.reduce((sum, it) => {
     return sum + Number(it.price || 0) * (1 - Number(it.ck || 0) / 100) * Number(it.qty || 0);
@@ -74,28 +84,40 @@ function renderOrderView(container) {
       ${isAdmin ? `<div class="grid-2" style="background:#eff6ff;padding:10px;border-radius:10px;margin-bottom:12px">
         <div>
           <label class="muted"><b>Nhân viên Sale lên đơn</b></label>
-          <select id="ord-sale-select" class="input" style="margin-top:4px">
-            ${APP_STATE.data.staffs.map(s => `<option value="${s.fullName}" ${s.fullName === ORDER_UI.saleName ? "selected" : ""}>${s.fullName} (${s.role})</option>`).join("")}
-          </select>
+          <div style="display:flex;gap:6px;margin-top:4px;align-items:center">
+            <select id="ord-sale-select" class="input" style="flex:1">
+              <option value="" ${!ORDER_UI.saleName ? "selected" : ""}>-- Không chọn Sale --</option>
+              ${APP_STATE.data.staffs.map(s => `<option value="${s.fullName}" ${s.fullName === ORDER_UI.saleName ? "selected" : ""}>${s.fullName} (${s.role})</option>`).join("")}
+            </select>
+            ${ORDER_UI.saleName ? `<button type="button" id="btn-clear-sale" class="btn btn-outline btn-sm" title="Bỏ chọn Sale" style="padding:10px 12px;color:var(--red)">✕</button>` : ""}
+          </div>
         </div>
         <div style="display:flex;align-items:flex-end;padding-bottom:6px">
-          <div>SĐT Sale: <b style="color:var(--blue)">${saleObj?.phone || "Chưa cập nhật"}</b></div>
+          <div>SĐT Sale: <b style="color:var(--blue)">${saleObj?.phone || (ORDER_UI.saleName ? "Chưa cập nhật" : "---")}</b></div>
         </div>
       </div>` : ""}
 
       <div style="position:relative">
         <label class="muted"><b>Khách hàng *</b></label>
-        <input id="ord-cust-input" type="text" class="input" style="margin-top:4px"
-          value="${ORDER_UI.custQuery.replace(/"/g, "&quot;")}"
-          placeholder="Gõ tên khách hàng hoặc SĐT (không dấu)..." />
+        <div style="display:flex;gap:6px;margin-top:4px;align-items:center">
+          <input id="ord-cust-input" type="text" class="input" style="flex:1"
+            value="${ORDER_UI.custQuery.replace(/"/g, "&quot;")}"
+            placeholder="Gõ tên khách hàng hoặc SĐT (không dấu)..." autocomplete="off" />
+          ${ORDER_UI.custQuery || ORDER_UI.customer ? `<button type="button" id="btn-clear-cust" class="btn btn-outline btn-sm" title="Xóa chọn khách" style="padding:10px 12px;color:var(--red)">✕</button>` : ""}
+        </div>
+
         ${ORDER_UI.showCustList ? `<div id="ord-cust-dropdown" class="dropdown-list">
-          ${custMatches.map((c, idx) => `<div class="dropdown-item" data-cidx="${idx}">
-            <div>
-              <div><b>${c.name}</b></div>
-              <div class="muted">${c.phone || ""} ${c.address ? " - " + c.address : ""}</div>
-            </div>
-            <div style="color:var(--red);font-weight:700;white-space:nowrap">Nợ: ${formatMoney(c.debt)}đ</div>
-          </div>`).join("")}
+          ${APP_STATE.data.customers.length === 0
+            ? `<div class="dropdown-item muted">Chưa tải được dữ liệu khách hàng (kiểm tra tên cột sheet Khach_Hang)</div>`
+            : custMatches.length === 0
+            ? `<div class="dropdown-item muted">Không tìm thấy khách hàng phù hợp</div>`
+            : custMatches.map((c, idx) => `<div class="dropdown-item" data-cidx="${idx}">
+                <div>
+                  <div><b>${c.name}</b></div>
+                  <div class="muted">${c.phone || ""} ${c.address ? " - " + c.address : ""}</div>
+                </div>
+                <div style="color:var(--red);font-weight:700;white-space:nowrap">Nợ: ${formatMoney(c.debt)}đ</div>
+              </div>`).join("")}
         </div>` : ""}
       </div>
 
@@ -107,9 +129,12 @@ function renderOrderView(container) {
     </div>
 
     <div class="card">
-      <input id="ord-prod-input" type="text" class="input"
-        value="${ORDER_UI.prodQuery.replace(/"/g, "&quot;")}"
-        placeholder="Gõ tên sản phẩm hoặc mã SP để tìm (hỗ trợ không dấu)..." />
+      <div style="display:flex;gap:6px;align-items:center">
+        <input id="ord-prod-input" type="text" class="input" style="flex:1"
+          value="${ORDER_UI.prodQuery.replace(/"/g, "&quot;")}"
+          placeholder="Gõ tên sản phẩm hoặc mã SP để tìm (hỗ trợ không dấu)..." autocomplete="off" />
+        ${ORDER_UI.prodQuery ? `<button type="button" id="btn-clear-prod" class="btn btn-outline btn-sm" title="Đóng tìm kiếm" style="padding:10px 12px;color:var(--red)">✕</button>` : ""}
+      </div>
 
       ${ORDER_UI.prodQuery.trim() ? `<div class="dropdown-list">
         ${prodMatches.length === 0 ? `<div class="dropdown-item muted">Không tìm thấy sản phẩm phù hợp</div>` :
@@ -170,7 +195,7 @@ function renderOrderView(container) {
   bindOrderEvents(custMatches);
 }
 
-function addProdByCode(code) {
+function addProdByCode(code, keepSearch = false) {
   const prod = APP_STATE.data.products.find(p => p.code === code);
   if (!prod) return;
   const stock = Number(prod.stock || 0);
@@ -195,28 +220,74 @@ function addProdByCode(code) {
       maxStock: stock
     });
   }
-  renderOrderView(document.getElementById("main-view"));
+  if (!keepSearch) {
+    ORDER_UI.prodQuery = "";
+    renderOrderView(document.getElementById("main-view"));
+  }
 }
 
 function bindOrderEvents(custMatches) {
   const saleSel = document.getElementById("ord-sale-select");
-  if (saleSel) saleSel.onchange = (e) => { ORDER_UI.saleName = e.target.value; renderOrderView(document.getElementById("main-view")); };
+  if (saleSel) {
+    saleSel.onchange = (e) => {
+      ORDER_UI.saleName = e.target.value;
+      renderOrderView(document.getElementById("main-view"));
+    };
+  }
+
+  const clearSaleBtn = document.getElementById("btn-clear-sale");
+  if (clearSaleBtn) {
+    clearSaleBtn.onclick = () => {
+      ORDER_UI.saleName = "";
+      renderOrderView(document.getElementById("main-view"));
+    };
+  }
 
   const cancelEdit = document.getElementById("btn-cancel-edit-order");
-  if (cancelEdit) cancelEdit.onclick = () => { ORDER_UI.orderId = null; ORDER_UI.cart = []; renderOrderView(document.getElementById("main-view")); };
+  if (cancelEdit) {
+    cancelEdit.onclick = () => {
+      ORDER_UI.orderId = null;
+      ORDER_UI.cart = [];
+      renderOrderView(document.getElementById("main-view"));
+    };
+  }
 
   const custInp = document.getElementById("ord-cust-input");
-  custInp.onfocus = () => { ORDER_UI.showCustList = true; renderOrderView(document.getElementById("main-view")); };
+  custInp.onfocus = () => {
+    if (!ORDER_UI.showCustList) {
+      ORDER_UI.showCustList = true;
+      renderOrderView(document.getElementById("main-view"));
+      const nextInp = document.getElementById("ord-cust-input");
+      if (nextInp) {
+        nextInp.focus();
+        nextInp.setSelectionRange(nextInp.value.length, nextInp.value.length);
+      }
+    }
+  };
   custInp.oninput = (e) => {
     ORDER_UI.custQuery = e.target.value;
     ORDER_UI.showCustList = true;
     renderOrderView(document.getElementById("main-view"));
     const nextInp = document.getElementById("ord-cust-input");
-    if (nextInp) { nextInp.focus(); nextInp.setSelectionRange(nextInp.value.length, nextInp.value.length); }
+    if (nextInp) {
+      nextInp.focus();
+      nextInp.setSelectionRange(nextInp.value.length, nextInp.value.length);
+    }
   };
 
+  const clearCustBtn = document.getElementById("btn-clear-cust");
+  if (clearCustBtn) {
+    clearCustBtn.onclick = () => {
+      ORDER_UI.customer = null;
+      ORDER_UI.custQuery = "";
+      ORDER_UI.showCustList = false;
+      renderOrderView(document.getElementById("main-view"));
+    };
+  }
+
   document.querySelectorAll("[data-cidx]").forEach(el => {
-    el.onclick = () => {
+    el.onmousedown = (e) => {
+      e.preventDefault();
       const c = custMatches[Number(el.getAttribute("data-cidx"))];
       if (c) {
         ORDER_UI.customer = c;
@@ -232,8 +303,19 @@ function bindOrderEvents(custMatches) {
     ORDER_UI.prodQuery = e.target.value;
     renderOrderView(document.getElementById("main-view"));
     const nextInp = document.getElementById("ord-prod-input");
-    if (nextInp) { nextInp.focus(); nextInp.setSelectionRange(nextInp.value.length, nextInp.value.length); }
+    if (nextInp) {
+      nextInp.focus();
+      nextInp.setSelectionRange(nextInp.value.length, nextInp.value.length);
+    }
   };
+
+  const clearProdBtn = document.getElementById("btn-clear-prod");
+  if (clearProdBtn) {
+    clearProdBtn.onclick = () => {
+      ORDER_UI.prodQuery = "";
+      renderOrderView(document.getElementById("main-view"));
+    };
+  }
 
   document.querySelectorAll(".ord-multi-cb").forEach(cb => {
     cb.onchange = (e) => {
@@ -243,16 +325,17 @@ function bindOrderEvents(custMatches) {
   });
 
   document.querySelectorAll(".ord-add-prod").forEach(el => {
-    el.onclick = () => addProdByCode(el.getAttribute("data-code"));
+    el.onclick = () => addProdByCode(el.getAttribute("data-code"), false);
   });
 
   const fabOk = document.getElementById("fab-multi-ok");
   if (fabOk) {
     fabOk.onclick = () => {
       Object.keys(ORDER_UI.multiChecked).forEach(code => {
-        if (ORDER_UI.multiChecked[code]) addProdByCode(code);
+        if (ORDER_UI.multiChecked[code]) addProdByCode(code, true);
       });
       ORDER_UI.multiChecked = {};
+      ORDER_UI.prodQuery = "";
       renderOrderView(document.getElementById("main-view"));
     };
   }
@@ -312,7 +395,7 @@ function bindOrderEvents(custMatches) {
     if (!ORDER_UI.cart.length) return Swal.fire("Giỏ trống", "Vui lòng chọn sản phẩm", "warning");
     try {
       await callApi("saveDraftToSheet", [
-        ORDER_UI.saleName,
+        ORDER_UI.saleName || APP_STATE.user.fullName,
         ORDER_UI.customer.name,
         JSON.stringify({ customer: ORDER_UI.customer, items: ORDER_UI.cart, saleName: ORDER_UI.saleName }),
         ORDER_UI.draftId || ""
