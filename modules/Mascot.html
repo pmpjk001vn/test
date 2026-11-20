@@ -1,0 +1,1085 @@
+<!-- =====================================================================
+  Mascot.html - 12 linh vật con giáp Việt Nam (SVG tự vẽ, không cần file ảnh)
+  Chỉ điện thoại | chỉ Sale được chỉ định trong MASCOT_CONFIG
+
+  BẢN CẬP NHẬT:
+   1) Nhấp giữ linh vật rồi kéo ĐI ĐÂU CŨNG ĐƯỢC (kể cả ra khỏi thanh panel).
+      - Thả ngoài panel: nó đứng ở chỗ đó và đi qua đi lại quanh đó.
+      - Thả lại trên thanh panel: nó vào lại panel và đi qua đi lại ở đó.
+   2) Bấm "XÁC NHẬN LƯU ĐƠN" xong, linh vật nhảy ra màn hình, chạy NGẪU NHIÊN
+      2 vòng rồi chạy về chỗ cũ, có bong bóng thoại ngay miệng.
+      (Tự bắt nút #btnSubmitOrder. Cũng có thể gọi thủ công: mascotCelebrate('Đã Lên Đơn Rồi'))
+   3) CHỈ ID được chỉ định trong MASCOT_CONFIG mới có linh vật và dùng được
+      các chức năng (kéo thả, ăn mừng, demo). ID khác: không có gì hết.
+   4) Nút 🐾 ngay bên phải tên người dùng trên thanh panel: bấm -> popup 12 con giáp + dê béo -> chọn để đổi linh vật.
+      Chỉ ID có linh vật mới thấy nút 🐾. Lựa chọn được nhớ theo ID trên thiết bị (localStorage).
+      Nếu nút 🐾 không nằm đúng chỗ: điền MASCOT_NAME_SELECTOR (selector của phần tử chứa tên).
+
+  12 con:  chuot (Tý) · trau (Sửu) · cop (Dần) · meo (Mão) · rong (Thìn) · ran (Tỵ)
+           ngua (Ngọ) · de (Mùi) · khi (Thân) · ga (Dậu) · cho (Tuất) · heo (Hợi)
+  Thêm: de2 (dê béo)
+
+  LƯU Ý TÍCH HỢP:
+   - Gọi initMascot() sau khi đăng nhập.
+   - Gọi removeMascot() khi đăng xuất (con vật nằm ngoài thanh nav nên cần gỡ thủ công).
+  Xem thử tất cả (chỉ tài khoản có linh vật): Console gõ  mascotDemo()
+  Thử hiệu ứng lên đơn: Console gõ  mascotCelebrate()
+===================================================================== -->
+<style>
+  /* Lane chỉ là chỗ giữ vị trí trên thanh panel, không chứa con vật nữa */
+  #mascotLane{
+    position:absolute; left:0; right:0; bottom:0; height:44px;
+    overflow:hidden; pointer-events:none; z-index:1;
+  }
+  /* Con vật nằm ở lớp fixed của trang => kéo ra khỏi panel được */
+  #mascotRunner{
+    position:fixed; left:0; top:0; width:var(--m-size,44px); height:var(--m-size,44px);
+    z-index:99990; will-change:transform;
+    pointer-events:auto;            /* riêng con vật thì bấm/kéo được */
+    touch-action:none;              /* kéo trên điện thoại không bị cuộn trang */
+    cursor:grab;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  }
+  #mascotRunner.m-drag{ cursor:grabbing; }
+
+  /* Con vật chạy lúc ăn mừng (nằm trên cùng màn hình, không chặn thao tác) */
+  #mascotRoamer{
+    position:fixed; left:0; top:0; width:var(--m-size,44px); height:var(--m-size,44px);
+    z-index:100000; pointer-events:none; will-change:transform;
+  }
+  #mascotRoamer .mBody .m-a, #mascotRoamer .mBody .m-b{ animation-duration:.24s; }   /* chân chạy nhanh hơn */
+
+  /* Bong bóng thoại */
+  #mascotBubble{
+    position:fixed; left:0; top:0; z-index:100001; pointer-events:none;
+    background:#fff; color:#1a56db; border:1.5px solid #1a56db; border-radius:12px;
+    padding:6px 11px; font:700 12px/1.2 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    white-space:nowrap; box-shadow:0 3px 10px rgba(0,0,0,.25);
+    opacity:0; transition:opacity .25s; will-change:transform;
+  }
+  #mascotBubble.show{ opacity:1; }
+  #mascotBubble::after{                       /* mũi nhọn chỉ xuống miệng con vật */
+    content:''; position:absolute; bottom:-6.5px; left:calc(var(--tail,16px) - 5px);
+    width:10px; height:10px; background:#fff;
+    border-right:1.5px solid #1a56db; border-bottom:1.5px solid #1a56db;
+    transform:rotate(45deg);
+  }
+
+  .mBody{
+    width:100%; height:100%;
+    animation:mascotBob .42s ease-in-out infinite;
+    filter:drop-shadow(0 2px 1.5px rgba(0,0,0,.35));
+    transform-origin:bottom center;
+  }
+  .mBody svg{ width:100%; height:100%; display:block; overflow:visible; }
+
+  /* Đang bị nhấc lên: phóng to nhẹ, chân đạp loạn */
+  .m-drag .mBody{ animation:none; transform:translateY(-5px) scale(1.12) rotate(-5deg); }
+  .m-drag .mBody .m-a, .m-drag .mBody .m-b{ animation-duration:.14s; }
+
+  @keyframes mascotBob{
+    0%,100%{ transform:translateY(0)    rotate(-2deg); }
+    50%    { transform:translateY(-3px) rotate(2deg);  }
+  }
+
+  /* Chân chạy chéo nhau, đuôi vẫy, tai giật, mắt chớp */
+  .mBody .m-a, .mBody .m-b{ transform-box:fill-box; transform-origin:50% 10%; }
+  .mBody .m-a{ animation:mLeg .42s ease-in-out infinite alternate; }
+  .mBody .m-b{ animation:mLeg .42s ease-in-out infinite alternate-reverse; }
+  @keyframes mLeg{ from{ transform:rotate(-28deg); } to{ transform:rotate(28deg); } }
+
+  .mBody .m-tail{ transform-box:fill-box; transform-origin:100% 100%; animation:mWag .5s ease-in-out infinite alternate; }
+  .mBody .m-tail.fast{ animation-duration:.2s; }
+  .mBody .m-tail.hang{ transform-origin:100% 0%; }          /* đuôi buông xuống (trâu, ngựa) */
+  @keyframes mWag{ from{ transform:rotate(-12deg); } to{ transform:rotate(14deg); } }
+
+  .mBody .m-ear{ transform-box:fill-box; transform-origin:50% 100%; animation:mEar 3s ease-in-out infinite; }
+  @keyframes mEar{ 0%,84%,100%{ transform:rotate(0); } 89%{ transform:rotate(-9deg); } 94%{ transform:rotate(3deg); } }
+
+  .mBody .m-eye{ transform-box:fill-box; transform-origin:50% 50%; animation:mBlink 3.6s infinite; }
+  @keyframes mBlink{ 0%,92%,100%{ transform:scaleY(1); } 96%{ transform:scaleY(.1); } }
+
+  /* Rắn: thân lượn sóng, đầu lắc, lưỡi thè */
+  .mBody .m-seg{ animation:mSeg .45s ease-in-out infinite alternate; }
+  @keyframes mSeg{ from{ transform:translateY(-3px); } to{ transform:translateY(3px); } }
+  .mBody .m-head{ transform-box:fill-box; transform-origin:30% 70%; animation:mHead .45s ease-in-out infinite alternate; }
+  @keyframes mHead{ from{ transform:rotate(-4deg); } to{ transform:rotate(4deg); } }
+  .mBody .m-tongue{ transform-box:fill-box; transform-origin:0% 50%; animation:mTongue 1.3s infinite; }
+  @keyframes mTongue{ 0%,60%,100%{ transform:scaleX(.1); } 70%,90%{ transform:scaleX(1); } }
+
+  /* Gà: vỗ cánh khi chạy */
+  .mBody .m-wing{ transform-box:fill-box; transform-origin:60% 10%; animation:mWing .3s ease-in-out infinite alternate; }
+  @keyframes mWing{ from{ transform:rotate(-8deg); } to{ transform:rotate(10deg); } }
+
+  /* Rồng châu Á: thân lượn sóng, đầu nhấp nhô theo, râu vẫy */
+  .mBody .m-dseg{ animation:mDSeg .62s ease-in-out infinite alternate; }
+  @keyframes mDSeg{ from{ transform:translateY(-4px); } to{ transform:translateY(4px); } }
+  .mBody .m-whisk{ transform-box:fill-box; transform-origin:0% 50%; animation:mWhisk .55s ease-in-out infinite alternate; }
+  @keyframes mWhisk{ from{ transform:rotate(-9deg); } to{ transform:rotate(11deg); } }
+
+  /* ===== Nút 🐾 đổi linh vật: nằm ở lớp fixed, bám ngay sau tên người dùng ===== */
+  #mascotPaw{
+    position:fixed; left:0; top:0; z-index:99995; display:none; will-change:transform;
+    width:28px; height:28px; padding:0; border:0; border-radius:50%;
+    background:rgba(255,255,255,.2); color:#fff; font-size:15px; line-height:28px; text-align:center;
+    cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+  }
+  #mascotPaw:active{ background:rgba(255,255,255,.4); }
+
+  /* ===== Popup chọn linh vật ===== */
+  #mascotPickBack{
+    position:fixed; inset:0; z-index:100020; background:rgba(15,23,42,.45);
+    display:flex; justify-content:center; align-items:flex-start; padding:72px 12px 12px;
+    opacity:0; transition:opacity .18s;
+  }
+  #mascotPickBack.show{ opacity:1; }
+  #mascotPicker{
+    width:min(100%,360px); background:#fff; border-radius:18px; padding:14px 12px 12px;
+    box-shadow:0 14px 34px rgba(0,0,0,.32);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    transform:translateY(-10px) scale(.97); transition:transform .18s;
+  }
+  #mascotPickBack.show #mascotPicker{ transform:none; }
+  .mpHead{ display:flex; align-items:center; justify-content:space-between; padding:0 4px 10px; color:#1a56db; font-weight:700; font-size:15px; }
+  .mpX{ width:30px; height:30px; border:0; border-radius:50%; background:#eef2ff; color:#1a56db; font-size:14px; font-weight:700; cursor:pointer; }
+  .mpGrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .mpItem{
+    border:2px solid transparent; background:#f4f6fb; border-radius:14px; padding:6px 2px 5px;
+    text-align:center; cursor:pointer; font:600 12px/1.2 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:#1f2937;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .mpItem .mBody{ width:54px; height:54px; margin:0 auto 3px; }
+  .mpItem small{ display:block; font-weight:500; font-size:10.5px; color:#6b7280; }
+  .mpItem.on{ border-color:#1a56db; background:#e8efff; }
+  .mpItem:active{ transform:scale(.95); }
+  .mpItem:last-child:nth-child(4n+1){ grid-column:2 / span 2; }   /* ô lẻ cuối nằm giữa */
+  @media (prefers-reduced-motion:reduce){ .mpItem .mBody, .mpItem .mBody *{ animation:none !important; } }
+</style>
+
+<script>
+// =====================================================================
+// CẤU HÌNH: ID nhân viên (viết thường) -> con giáp riêng
+//   animal: chuot | trau | cop | meo | rong | ran | ngua | de | de2 | khi | ga | cho | heo
+//           (gõ tiếng Anh cũng được: mouse, buffalo, tiger, cat, dragon, snake,
+//            horse, goat, monkey, rooster, dog, pig)
+//   size  : kích thước (px)
+//   speed : số giây cho 1 vòng đi + về trên thanh panel (càng lớn càng chậm)
+// Chỉ ID có trong danh sách này MỚI có linh vật.
+// =====================================================================
+const MASCOT_CONFIG = {
+  '':   { animal: 'chuot', size: 44, speed: 14 },
+  'sale02':   { animal: 'trau',  size: 46, speed: 22 },
+  'sale03':   { animal: 'cop',   size: 44, speed: 13 },
+  'phongkho':   { animal: 'meo',   size: 47, speed: 24 },
+  'tester':   { animal: 'rong',  size: 46, speed: 16 },
+  'sale06':   { animal: 'ran',   size: 44, speed: 20 },
+  'sale07':   { animal: 'ngua',  size: 46, speed: 11 },
+  'salenghi': { animal: 'de2',   size: 50, speed: 26 },
+  'sale09':   { animal: 'khi',   size: 44, speed: 12 },
+  '':   { animal: 'ga',    size: 44, speed: 15 },
+  'sale11':   { animal: 'cho',   size: 44, speed: 16 },
+  'sale12':   { animal: 'heo',   size: 44, speed: 19 },
+  'thuysale': { animal: 'de2',   size: 48, speed: 23 }   // dê béo, to hơn và chạy chậm hơn
+};
+
+// Đổi thành true nếu muốn MỌI tài khoản Sale đều có linh vật:
+// ID không nằm trong danh sách trên sẽ được gán 1 con cố định theo ID.
+const MASCOT_AUTO_ALL_SALE = false;
+
+// ---- Thông số chạy ăn mừng khi lên đơn ----
+const MASCOT_ROAM_TEXT   = 'Đã Lên Đơn Rồi';  // nội dung bong bóng thoại
+const MASCOT_ROAM_SPEED  = 260;               // px/giây (vừa phải; tăng = chạy nhanh hơn)
+const MASCOT_ROAM_LAPS   = 2;                 // số vòng
+const MASCOT_ROAM_POINTS = 4;                 // số điểm ngẫu nhiên mỗi vòng
+const MASCOT_BUBBLE_STAY = 2600;              // ms bong bóng còn hiện sau khi về chỗ
+const MASCOT_ACTIONS = ['run', 'zigzag', 'jump', 'spin', 'dance'];
+let _mLastAct = '';
+
+// ---- Đi qua đi lại sau khi kéo thả ----
+// Bán kính đi lại quanh chỗ vừa thả (px). Đặt 0 = đi hết cả chiều rộng.
+const MASCOT_PATROL_RADIUS = 0;
+
+const MASCOT_NAMES = {
+  chuot:'Chuột (Tý)', trau:'Trâu (Sửu)', cop:'Cọp (Dần)', meo:'Mèo (Mão)',
+  rong:'Rồng (Thìn)', ran:'Rắn (Tỵ)', ngua:'Ngựa (Ngọ)', de:'Dê (Mùi)', de2:'Dê béo (Mùi)',
+  khi:'Khỉ (Thân)', ga:'Gà (Dậu)', cho:'Chó (Tuất)', heo:'Heo (Hợi)'
+};
+const MASCOT_ALIAS = {
+  mouse:'chuot', rat:'chuot', buffalo:'trau', ox:'trau', tiger:'cop', ho:'cop',
+  cat:'meo', dragon:'rong', snake:'ran', horse:'ngua', goat:'de',
+  monkey:'khi', rooster:'ga', chicken:'ga', dog:'cho', pig:'heo', lon:'heo'
+};
+
+// ---------------------------------------------------------------------
+// HÌNH VẼ (quay mặt sang phải, khung 64x64)
+// ---------------------------------------------------------------------
+function _mLeg(cls, x, fill, paw, h){
+  h = h || 16;
+  return '<g class="' + cls + '"><rect x="' + x + '" y="42" width="6.5" height="' + h + '" rx="3.2" fill="' + fill + '"/>' +
+         (paw ? '<ellipse cx="' + (x + 3.25) + '" cy="' + (41.5 + h) + '" rx="4.2" ry="2.5" fill="' + paw + '"/>' : '') + '</g>';
+}
+
+// Khung chung cho thú 4 chân. Tuỳ chọn: hx,hy,hr (đầu), ex,ey (mắt), legH (độ dài chân)
+// Con nào có sẵn "svg" thì dùng luôn (rắn, gà).
+function _mAnimalSVG(o){
+  if(o.svg) return o.svg;
+  const legFar = o.legFar || o.dark, h = o.legH || 16;
+  const hx = o.hx || 48, hy = o.hy || 27, hr = o.hr || 11, ex = o.ex || 51.5, ey = o.ey || 25;
+  return '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">' +
+    _mLeg('m-a', 42, legFar, o.paw, h) + _mLeg('m-b', 22, legFar, o.paw, h) +      // 2 chân xa
+    (o.tail || '') +
+    '<ellipse cx="30" cy="38" rx="17" ry="11.5" fill="' + o.body + '"/>' +          // thân
+    (o.belly ? '<ellipse cx="30" cy="44" rx="11" ry="4.5" fill="' + o.belly + '"/>' : '') +
+    (o.mark || '') +
+    _mLeg('m-a', 15, o.leg, o.paw, h) + _mLeg('m-b', 35, o.leg, o.paw, h) +         // 2 chân gần
+    (o.earB || '') +
+    '<circle cx="' + hx + '" cy="' + hy + '" r="' + hr + '" fill="' + (o.head || o.body) + '"/>' +   // đầu
+    (o.face || '') +
+    '<g class="m-eye"><circle cx="' + ex + '" cy="' + ey + '" r="2.3" fill="' + (o.eye || '#222') + '"/>' +
+    '<circle cx="' + (ex + .8) + '" cy="' + (ey - .8) + '" r=".8" fill="' + (o.hi || '#fff') + '"/></g>' +
+    (o.earF || '') +
+    '</svg>';
+}
+
+// 🐍 Rắn xanh: thân thon dài uốn lượn, ngóc đầu, đầu to rõ, sọc bụng sáng + đốm lưng, thè lưỡi chẻ
+function _mSnakeSVG(){
+  const N = 20, pts = [];
+  const sm = function(u){ u = Math.max(0, Math.min(1, u)); return u * u * (3 - 2 * u); };
+  const cl = function(u){ return { x: 4 + u * 41, y: 52 + 3 * Math.sin(u * Math.PI * 3.6) - 15 * sm((u - .6) / .4) }; };
+  // lấy mẫu dày rồi chia đều theo chiều dài đường cong => các đốt cách đều nhau, đoạn cổ dốc không bị thưa
+  const dense = [], cum = [0];
+  for(let k = 0; k <= 300; k++){
+    const p = cl(k / 300); dense.push(p);
+    if(k) cum.push(cum[k - 1] + Math.hypot(p.x - dense[k - 1].x, p.y - dense[k - 1].y));
+  }
+  for(let i = 0, k = 0; i < N; i++){
+    const t = i / (N - 1), want = t * cum[300];
+    while(k < 300 && cum[k] < want) k++;
+    const p = dense[k];
+    const r = t < .55 ? 1.5 + 2.5 * Math.sin(t / .55 * Math.PI / 2) : 4 - .6 * ((t - .55) / .45);
+    pts.push({ x: p.x, y: p.y, r: r, d: (-i * .045).toFixed(2) + 's' });
+  }
+  const neck = pts[N - 1], hd = neck.d;
+  const G = function(d, inner){ return '<g class="m-seg" style="animation-delay:' + d + '">' + inner + '</g>'; };
+  const f = function(v){ return v.toFixed(1); };
+  let s = '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">';
+  // lớp 1: viền tối (vẽ trước để không có đường cung cắt ngang thân)
+  pts.forEach(function(p){ s += G(p.d, '<circle cx="' + f(p.x) + '" cy="' + f(p.y) + '" r="' + (p.r + .8).toFixed(2) + '" fill="#4E9A33"/>'); });
+  s += G(hd, '<ellipse cx="51.5" cy="31" rx="9.4" ry="7.2" fill="#4E9A33"/>');
+  // lớp 2: nền bụng sáng (cả đốt) -> lớp 3: lưng xanh nhích lên trên => chừa dải bụng sáng liền mạch bên dưới
+  pts.forEach(function(p){ s += G(p.d, '<circle cx="' + f(p.x) + '" cy="' + f(p.y) + '" r="' + p.r.toFixed(2) + '" fill="#DDF59E"/>'); });
+  s += G(hd, '<ellipse cx="51.5" cy="31" rx="8.6" ry="6.4" fill="#7ACD52"/>');
+  pts.forEach(function(p, i){
+    const full = i < 3;   // ngọn đuôi tô xanh trọn đốt
+    s += G(p.d, '<circle cx="' + f(p.x) + '" cy="' + f(p.y - (full ? 0 : p.r * .22)) + '" r="' + (p.r * (full ? 1 : .76)).toFixed(2) + '" fill="#6DBE45"/>');
+  });
+  // lớp 4: đốm lưng sẫm (cứ 3 đốt một đốm)
+  pts.forEach(function(p, i){
+    if(i % 3 === 1 && i > 1){
+      s += G(p.d, '<ellipse cx="' + f(p.x) + '" cy="' + f(p.y - p.r * .45) + '" rx="' + (p.r * .5).toFixed(2) + '" ry="' + (p.r * .3).toFixed(2) + '" fill="#3E8E3A"/>');
+    }
+  });
+  s += G(hd,
+    '<path d="M47.5 25.6 l2.4 -2 l2.4 2 l-2.4 2z" fill="#3E8E3A"/>' +
+    '<ellipse cx="55" cy="34" rx="5.4" ry="2.6" fill="#DDF59E"/>' +
+    '<circle cx="53" cy="33.2" r="2" fill="#FF8FA3" opacity=".45"/>' +
+    '<circle cx="59.6" cy="30.2" r=".6" fill="#3E6E2A"/>' +
+    '<path d="M52.5 35.2 q3.6 2 7.8 -.4" stroke="#3E6E2A" stroke-width=".9" fill="none" stroke-linecap="round"/>' +
+    '<g class="m-eye"><circle cx="54.2" cy="28" r="2.5" fill="#222"/><circle cx="55" cy="27.1" r=".9" fill="#fff"/></g>' +
+    '<path class="m-tongue" d="M60.3 35 L64.8 35 M64.8 35 L67 33.6 M64.8 35 L67 36.4" stroke="#E63946" stroke-width="1.1" fill="none" stroke-linecap="round"/>');
+  return s + '</svg>';
+}
+
+// 🐉 Rồng châu Á: KHÔNG chân, thân dài uốn lượn bay trên trời, bờm + gai lưng đỏ, sừng, râu vẫy
+function _mDragonSVG(){
+  const N = 13;                                   // số đốt thân (0 = đuôi ... 12 = cổ)
+  let s = '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">';
+  for(let i = 0; i < N; i++){
+    const x = 6 + i * 3.4, y = 47 - i * .95 + 5 * Math.sin(i * .5), r = 1.6 + i * 0.3;   // thân uốn chữ S
+    s += '<g class="m-dseg" style="animation-delay:' + (-i * .08).toFixed(2) + 's">';
+    if(i === 0){                                  // ngọn đuôi: 2 túm lửa đỏ
+      s += '<path d="M' + (x + 1) + ' ' + y + ' C' + (x - 3) + ' ' + (y - 2) + ' ' + (x - 6) + ' ' + (y - 8) + ' ' + (x - 3.5) + ' ' + (y - 12) +
+           ' C' + (x - 1) + ' ' + (y - 9) + ' ' + (x + 2) + ' ' + (y - 8) + ' ' + (x + 2) + ' ' + (y - 4) + 'Z" fill="#E5452F"/>' +
+           '<path d="M' + (x + 1) + ' ' + (y + 1) + ' C' + (x - 4) + ' ' + (y + 2) + ' ' + (x - 6) + ' ' + (y + 7) + ' ' + (x - 3) + ' ' + (y + 9.5) +
+           ' C' + (x - 1) + ' ' + (y + 6) + ' ' + (x + 2) + ' ' + (y + 5) + ' ' + (x + 2) + ' ' + (y + 2) + 'Z" fill="#FF7A59"/>';
+    }
+    s += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r.toFixed(2) + '" fill="' + (i % 2 ? '#F5C542' : '#F8CE5C') +
+         '" stroke="#D99A1E" stroke-width=".7"/>' +
+         '<circle cx="' + (x + .4).toFixed(1) + '" cy="' + (y + r * .42).toFixed(1) + '" r="' + (r * .52).toFixed(2) + '" fill="#FFF0B3" opacity=".85"/>';
+    if(i % 2 === 1 && i > 1){                      // gai lưng đỏ
+      s += '<path d="M' + (x - 1.7).toFixed(1) + ' ' + (y - r + .8).toFixed(1) + ' L' + x.toFixed(1) + ' ' + (y - r - 3.4).toFixed(1) +
+           ' L' + (x + 1.7).toFixed(1) + ' ' + (y - r + .8).toFixed(1) + 'Z" fill="#E5452F"/>';
+    }
+    s += '</g>';
+  }
+  return s +
+    '<g class="m-dseg" style="animation-delay:-1.04s"><g class="m-head">' +
+    '<path d="M47 24 C41 17 35 19 32 24 C37 22 40 25 41 30 C44 28 46 29 48 31Z" fill="#E5452F"/>' +            // bờm đỏ
+    '<path d="M48 22 C44 14 39 14 36 17 C40 17 43 19 44 24Z" fill="#FF7A59"/>' +                              // lớp bờm cam
+    '<path d="M49 22 C48 14 45 10 41 9 C44 12 45.5 16 45 23Z" fill="#F3E3A4" stroke="#D9C37A" stroke-width=".6"/>' +   // sừng sau
+    '<path d="M54 21 C55 13 53 9 50 7 C51.5 11 51 16 50 22Z" fill="#F3E3A4" stroke="#D9C37A" stroke-width=".6"/>' +    // sừng trước
+    '<ellipse cx="52" cy="29" rx="9" ry="7.6" fill="#F5C542" stroke="#D99A1E" stroke-width=".7"/>' +          // đầu
+    '<ellipse cx="58.5" cy="31" rx="6.2" ry="4.6" fill="#F9D863" stroke="#D99A1E" stroke-width=".6"/>' +      // mõm
+    '<circle cx="62" cy="29.5" r=".8" fill="#9A5A10"/>' +
+    '<path d="M53 34 q4.5 2.4 9.5 -.2" stroke="#9A5A10" stroke-width=".9" fill="none" stroke-linecap="round"/>' +
+    '<path d="M58 34.6 l1 2.1 l1 -2.1z" fill="#fff"/>' +
+    '<circle cx="54" cy="32" r="2" fill="#FF8FA3" opacity=".4"/>' +
+    '<g class="m-eye"><circle cx="54" cy="26" r="2.4" fill="#222"/><circle cx="54.8" cy="25.2" r=".85" fill="#fff"/></g>' +
+    '<path d="M51.5 22.6 q3 -2 5.6 -.4" stroke="#D99A1E" stroke-width="1.3" fill="none" stroke-linecap="round"/>' +
+    '<path class="m-whisk" d="M60 29 C64 26 63 22 66 20" stroke="#FFD76A" stroke-width="1.3" fill="none" stroke-linecap="round"/>' +
+    '<path class="m-whisk" d="M58 35.5 C61 38.5 59 42 62 44" stroke="#FFD76A" stroke-width="1.3" fill="none" stroke-linecap="round"/>' +
+    '<path class="m-whisk" d="M52.5 36 C53.5 41 50.5 43 52.5 46" stroke="#FFD76A" stroke-width="1.3" fill="none" stroke-linecap="round"/>' +
+    '</g></g></svg>';
+}
+
+// 🐓 Gà trống: 2 chân, mào đỏ, đuôi nhiều màu, vỗ cánh
+const _mChicken =
+  '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">' +
+  '<g class="m-tail"><path d="M18 37 C9 38 3 30 4 20" fill="none" stroke="#E63946" stroke-width="4" stroke-linecap="round"/>' +
+  '<path d="M18 33 C11 29 9 21 12 13" fill="none" stroke="#2E9E6B" stroke-width="4" stroke-linecap="round"/>' +
+  '<path d="M18 40 C8 43 1 37 1.5 29" fill="none" stroke="#2B6CB0" stroke-width="4" stroke-linecap="round"/></g>' +
+  '<g class="m-a"><rect x="33" y="46" width="2.8" height="12" rx="1.4" fill="#C98A10"/><path d="M31 59.5 h6.5" stroke="#C98A10" stroke-width="2.4" stroke-linecap="round"/></g>' +
+  '<g class="m-b"><rect x="24" y="46" width="2.8" height="12" rx="1.4" fill="#E9A21B"/><path d="M22 59.5 h6.5" stroke="#E9A21B" stroke-width="2.4" stroke-linecap="round"/></g>' +
+  '<ellipse cx="29" cy="37" rx="16" ry="12.5" fill="#F2A93B"/>' +
+  '<ellipse cx="37.5" cy="41" rx="8.5" ry="8" fill="#FFD27A"/>' +
+  '<g class="m-wing"><path d="M18 33 C22 28 33 28 38 35 C35 44 22 45 17 38Z" fill="#D9772B"/>' +
+  '<path d="M21 36 q5 -3 10 0 M22 40 q5 -3 10 0" stroke="#B85C1B" stroke-width="1.1" fill="none" stroke-linecap="round"/></g>' +
+  '<g class="m-ear"><circle cx="43.5" cy="15.5" r="3.2" fill="#E63946"/><circle cx="47.3" cy="13.8" r="3.6" fill="#E63946"/><circle cx="51.3" cy="15.3" r="3.1" fill="#E63946"/></g>' +
+  '<circle cx="47" cy="24" r="8.5" fill="#F2A93B"/>' +
+  '<path d="M54.5 22 L63 25.5 L54.5 28.6Z" fill="#FFB703"/><path d="M54.8 25.6 H61" stroke="#D98E00" stroke-width=".7" stroke-linecap="round"/>' +
+  '<path d="M54 28.5 q-1.5 5 .8 6.2 q2.4 -1 1.2 -6.2Z" fill="#E63946"/>' +
+  '<circle cx="51.5" cy="27" r="2" fill="#FF6F61" opacity=".35"/>' +
+  '<g class="m-eye"><circle cx="50" cy="22.2" r="2.1" fill="#222"/><circle cx="50.8" cy="21.4" r=".75" fill="#fff"/></g>' +
+  '</svg>';
+
+const MASCOT_ART = {
+  // 🐭 CHUỘT (Tý): xám, tai tròn to, đuôi hồng dài, mõm nhọn
+  chuot: {
+    body:'#B8B2AD', belly:'#EFE6DC', dark:'#8F8A85', leg:'#B8B2AD', paw:'#F4B6C2', hy:28, hr:10, ey:26,
+    tail:'<g class="m-tail"><path d="M15 38 C5 40 1 30 7 25 C11 22 9 16 4 16" fill="none" stroke="#F2A7B5" stroke-width="2" stroke-linecap="round"/></g>',
+    earB:'<g class="m-ear"><circle cx="41.5" cy="19" r="5.8" fill="#B8B2AD"/><circle cx="41.5" cy="19.3" r="3.5" fill="#F7B6C2"/></g>' +
+         '<g class="m-ear"><circle cx="53.5" cy="18" r="5.2" fill="#B8B2AD"/><circle cx="53.5" cy="18.3" r="3.1" fill="#F7B6C2"/></g>',
+    face:'<ellipse cx="57" cy="32" rx="6.5" ry="4.2" fill="#C9C3BE"/>' +
+         '<circle cx="53.5" cy="33" r="2.2" fill="#FF8FA3" opacity=".4"/>' +
+         '<circle cx="62.6" cy="30.8" r="1.7" fill="#F28CA0"/>' +
+         '<rect x="57.6" y="34.2" width="2.2" height="2.2" rx=".6" fill="#fff" stroke="#CDBFB3" stroke-width=".4"/>' +
+         '<path d="M58 31.5 L64.5 28.8 M58 33 L64.5 34" stroke="#6E6A66" stroke-width=".7" opacity=".7" stroke-linecap="round"/>'
+  },
+
+  // 🐃 TRÂU (Sửu): xám xanh, sừng cong vắt ra sau, mũi xỏ khoen, đuôi buông có chùm lông
+  trau: {
+    body:'#6F6D78', belly:'#85838E', dark:'#4F4D57', leg:'#6F6D78', legFar:'#4F4D57', paw:'#2E2C33',
+    mark:'<ellipse cx="38" cy="30" rx="8" ry="6" fill="#6F6D78"/>',
+    tail:'<g class="m-tail hang"><path d="M14 36 C8 38 7 46 9 52" fill="none" stroke="#4F4D57" stroke-width="2.4" stroke-linecap="round"/>' +
+         '<ellipse cx="9" cy="53.5" rx="2.6" ry="3.4" fill="#2E2C33"/></g>',
+    earB:'<path d="M52 18 C48 9 40 5 36 6 C41 9 45 13 47 18Z" fill="#D9CCAF"/>' +
+         '<path d="M42 21 C34 20 29 14 31 7 C34 12 40 14 45 16Z" fill="#EFE4CC" stroke="#CDBF9F" stroke-width=".8"/>',
+    face:'<ellipse cx="57" cy="31.5" rx="6.8" ry="5.2" fill="#9B99A5"/>' +
+         '<ellipse cx="60.2" cy="30.2" rx=".9" ry="1.3" fill="#3A3841"/>' +
+         '<path d="M53.5 34.8 q3 1.6 6.2 0" stroke="#3A3841" stroke-width=".9" fill="none" stroke-linecap="round"/>' +
+         '<circle cx="62.3" cy="33.4" r="1.6" fill="none" stroke="#E9B949" stroke-width="1"/>',
+    earF:'<g class="m-ear"><ellipse cx="40" cy="26" rx="5.2" ry="2.6" transform="rotate(-20 40 26)" fill="#5A5862"/></g>'
+  },
+
+  // 🐯 CỌP (Dần): cam sọc đen, tai tròn, mõm trắng, đuôi sọc
+  cop: {
+    body:'#F29A2E', belly:'#FFF2DC', dark:'#D97A12', leg:'#F29A2E', legFar:'#D97A12', paw:'#FFF2DC',
+    mark:'<path d="M20 30 L22 36 M26 28 L27 35 M32 28 L32.5 34 M38 29.5 L38 35" stroke="#2A1A10" stroke-width="2.6" stroke-linecap="round" fill="none"/>',
+    tail:'<g class="m-tail"><path d="M16 38 C4 42 2 28 9 20" fill="none" stroke="#F29A2E" stroke-width="5.5" stroke-linecap="round"/>' +
+         '<path d="M16 38 C4 42 2 28 9 20" fill="none" stroke="#2A1A10" stroke-width="5.6" stroke-dasharray="2 5.5" stroke-dashoffset="3"/>' +
+         '<circle cx="9" cy="20" r="2.9" fill="#2A1A10"/></g>',
+    earB:'<g class="m-ear"><circle cx="41.5" cy="18" r="4.6" fill="#F29A2E"/><circle cx="41.5" cy="18.3" r="2.5" fill="#FFF2DC"/></g>' +
+         '<g class="m-ear"><circle cx="55" cy="17.5" r="4.3" fill="#F29A2E"/><circle cx="55" cy="17.8" r="2.3" fill="#FFF2DC"/></g>',
+    face:'<path d="M45.5 18 L46.2 21.5 M48.7 16.8 L48.7 20.8 M52 17.4 L51.3 21" stroke="#2A1A10" stroke-width="1.7" stroke-linecap="round"/>' +
+         '<path d="M40 30 L44.5 30.5 M40.5 34 L45 33" stroke="#2A1A10" stroke-width="1.5" stroke-linecap="round"/>' +
+         '<ellipse cx="56.5" cy="31.5" rx="6" ry="4.6" fill="#FFF2DC"/>' +
+         '<path d="M59.4 28.6 h3.4 l-1.7 2.1z" fill="#E8667A"/>' +
+         '<path d="M61.1 30.7 v1.6 M61.1 32.3 q-1.6 1.5 -3.4 .4 M61.1 32.3 q1.4 1.4 2.8 .3" stroke="#6B3A1A" stroke-width=".9" fill="none" stroke-linecap="round"/>'
+  },
+
+  // 🐱 MÈO (Mão): mèo vằn cam
+  meo: {
+    body:'#F4A259', belly:'#FFE6C7', dark:'#C77C35', leg:'#F4A259', paw:'#FFE6C7',
+    mark:'<path d="M22 28 L24.5 34 M29 27 L30.5 33 M16 33 L19 37" stroke="#C77C35" stroke-width="2.2" stroke-linecap="round" fill="none"/>',
+    tail:'<g class="m-tail"><path d="M16 38 C3 41 1 25 8.5 17.5" fill="none" stroke="#F4A259" stroke-width="5.5" stroke-linecap="round"/><circle cx="8.5" cy="17.5" r="2.9" fill="#C77C35"/></g>',
+    earB:'<g class="m-ear"><path d="M40 22 L41 9 L49 17Z" fill="#F4A259"/><path d="M42 19.5 L42.3 13 L46 17Z" fill="#F7A8B8"/></g>' +
+         '<g class="m-ear"><path d="M49 16.5 L56.5 9 L57.5 23Z" fill="#F4A259"/><path d="M51.2 18 L55 13.5 L55.6 21Z" fill="#F7A8B8"/></g>',
+    face:'<path d="M46.5 16.8 L46.8 20.5 M50 16.2 L50 20" stroke="#C77C35" stroke-width="1.6" stroke-linecap="round"/>' +
+         '<circle cx="53.5" cy="31" r="2.2" fill="#FF8FA3" opacity=".4"/>' +
+         '<path d="M57 28 h2.6 l-1.3 1.7z" fill="#F08FA0"/>' +
+         '<path d="M58.3 29.7 q-1.2 2 -3 1.2 M58.3 29.7 q1.2 2 2.8 1" stroke="#7A4A2A" stroke-width=".9" fill="none" stroke-linecap="round"/>' +
+         '<path d="M56 31 L63 29.6 M56 32 L63 33.6" stroke="#7A4A2A" stroke-width=".7" opacity=".55" stroke-linecap="round"/>'
+  },
+
+  // 🐉 RỒNG (Thìn): rồng châu Á không chân, thân uốn lượn bay trên trời, bờm + gai lưng đỏ, sừng, râu
+  rong: { svg: _mDragonSVG() },
+
+  // 🐍 RẮN (Tỵ): xanh lá, thân thon uốn lượn, ngóc đầu, sọc bụng sáng, thè lưỡi chẻ
+  ran: { svg: _mSnakeSVG() },
+
+  // 🐴 NGỰA (Ngọ): nâu, cổ dài, bờm + đuôi đen tuyền, vệt trắng trên mặt, chân cao
+  ngua: {
+    body:'#B9743A', dark:'#8F5527', leg:'#B9743A', legFar:'#8F5527', paw:'#3A2415', legH:17,
+    hx:49, hy:21, hr:8.5, ex:52, ey:19.5,
+    mark:'<path d="M34 32 C36 20 40 14 46 14 L54 22 C52 30 49 35 46 40Z" fill="#B9743A"/>' +
+         '<path d="M44 11.5 C37 14 33 23 34 34 L39 32 C38 25 40 19 46 15Z" fill="#4A2C17"/>',
+    tail:'<g class="m-tail hang"><path d="M14 35 C5 36 2 46 6 56 C9 48 11 44 15 42Z" fill="#4A2C17"/></g>',
+    earB:'<g class="m-ear"><path d="M45 15 L44 6 L50 12Z" fill="#B9743A"/><path d="M46 13 L45.7 8.8 L48.4 11.5Z" fill="#E7A99A"/></g>',
+    face:'<ellipse cx="57" cy="27.5" rx="7" ry="4.6" transform="rotate(28 57 27.5)" fill="#C98A52"/>' +
+         '<path d="M50.5 13 C53 17 55 21 57 24" stroke="#fff" stroke-width="2.2" opacity=".9" stroke-linecap="round" fill="none"/>' +
+         '<circle cx="61.6" cy="29.8" r=".9" fill="#3A2415"/>' +
+         '<path d="M56 31.6 q3 1.6 5 -.2" stroke="#5A3418" stroke-width=".9" fill="none" stroke-linecap="round"/>',
+    earF:'<path d="M44 12 C50 9 54 13 52.5 17 C51 14 48 13 44 12Z" fill="#4A2C17"/>'
+  },
+
+  // 🐐 DÊ (Mùi): trắng kem, sừng cong, râu cằm, mắt vàng, tai cụp ngang
+  de: {
+    body:'#F3EFE7', belly:'#FFFFFF', dark:'#CFC6B6', leg:'#F3EFE7', legFar:'#D9D1C2', paw:'#5B4B3C',
+    mark:'<ellipse cx="26" cy="32" rx="7" ry="3.6" fill="#DDD3C1"/>',
+    tail:'<g class="m-tail fast"><path d="M15 33 L10 27 L17 30Z" fill="#F3EFE7" stroke="#CFC6B6" stroke-width=".8" stroke-linejoin="round"/></g>',
+    earB:'<path d="M49 17 C47 7 41 4 39 7 C44 7 46 10 47 18Z" fill="#D2BE90"/>' +
+         '<path d="M43 19 C39 8 32 8 31 12 C36 11 39 14 41 21Z" fill="#BFA877"/>',
+    face:'<circle cx="51.5" cy="25" r="3.1" fill="#F5D36B"/>' +
+         '<ellipse cx="57" cy="31.5" rx="5.8" ry="4.4" fill="#fff" stroke="#E6DFD2" stroke-width=".6"/>' +
+         '<ellipse cx="61.5" cy="29.8" rx="1.7" ry="1.2" fill="#E39AA6"/>' +
+         '<path d="M53.5 34.2 q3 1.6 6 0" stroke="#8A7A68" stroke-width=".9" fill="none" stroke-linecap="round"/>' +
+         '<circle cx="53" cy="30.5" r="1.8" fill="#FF8FA3" opacity=".35"/>' +
+         '<g class="m-ear"><path d="M54.5 35.5 Q55.5 44 59.5 42 Q57.5 39.5 58 36Z" fill="#F3EFE7" stroke="#CFC6B6" stroke-width=".8"/></g>',
+    earF:'<g class="m-ear"><ellipse cx="41.5" cy="27" rx="5.4" ry="2.5" transform="rotate(22 41.5 27)" fill="#E9E2D4"/>' +
+         '<ellipse cx="41.5" cy="27" rx="3.4" ry="1.3" transform="rotate(22 41.5 27)" fill="#F4B6C2"/></g>'
+  },
+
+  // 🐒 KHỈ (Thân): nâu, mặt be, tai tròn, đuôi cuộn
+  khi: {
+    body:'#9A6A3E', belly:'#EBC99B', dark:'#6F4824', leg:'#9A6A3E', legFar:'#6F4824', paw:'#EBC99B',
+    tail:'<g class="m-tail"><path d="M15 37 C3 38 0 24 7 19 C12 15 15 21 11 22.5" fill="none" stroke="#9A6A3E" stroke-width="4.4" stroke-linecap="round"/></g>',
+    face:'<path d="M44 17 C46 11 52 10 54 15 C51 13 47 14 44 17Z" fill="#6F4824"/>' +
+         '<ellipse cx="54" cy="26" rx="7.5" ry="7" fill="#EBC99B"/>' +
+         '<ellipse cx="57.5" cy="32" rx="5.2" ry="4.2" fill="#F5DDB8"/>' +
+         '<circle cx="59.8" cy="30" r=".6" fill="#5A3820"/><circle cx="62" cy="30.4" r=".6" fill="#5A3820"/>' +
+         '<circle cx="53.5" cy="31" r="2" fill="#FF8FA3" opacity=".4"/>' +
+         '<path d="M54.5 34.3 q3.2 2 6.2 0" stroke="#5A3820" stroke-width="1" fill="none" stroke-linecap="round"/>',
+    earF:'<g class="m-ear"><circle cx="41.5" cy="26.5" r="5" fill="#9A6A3E"/><circle cx="42" cy="26.5" r="3" fill="#EBC99B"/></g>'
+  },
+
+  // 🐓 GÀ (Dậu): gà trống, mào đỏ, đuôi ba màu, vỗ cánh
+  ga: { svg: _mChicken },
+
+  // 🐶 CHÓ (Tuất): nâu, tai cụp, lè lưỡi
+  cho: {
+    body:'#C98B4F', belly:'#F4DDB8', dark:'#9A6430', leg:'#C98B4F', paw:'#F4DDB8',
+    mark:'<ellipse cx="25" cy="31" rx="6.5" ry="3.8" fill="#9A6430" opacity=".6"/>',
+    tail:'<g class="m-tail fast"><path d="M15 37 C8 36 6 29 9.5 23.5" fill="none" stroke="#C98B4F" stroke-width="5" stroke-linecap="round"/></g>',
+    face:'<ellipse cx="51" cy="24.5" rx="4.6" ry="4.2" fill="#9A6430" opacity=".55"/>' +
+         '<ellipse cx="56.5" cy="31" rx="6.2" ry="4.7" fill="#F4DDB8"/>' +
+         '<ellipse cx="61.3" cy="29.3" rx="2.3" ry="1.7" fill="#2B1D16"/>' +
+         '<path d="M56.5 33.8 q2 1.6 4.2 0" stroke="#5A3820" stroke-width="1" fill="none" stroke-linecap="round"/>' +
+         '<path d="M58.2 34.6 q.9 3.6 2.6 .2z" fill="#F0707F"/>',
+    earF:'<g class="m-ear" style="transform-origin:50% 0%"><ellipse cx="42.5" cy="26" rx="4.2" ry="8" fill="#7E4E22" transform="rotate(14 42.5 26)"/></g>'
+  },
+
+  // 🐷 HEO (Hợi): hồng, mũi tròn, đuôi xoắn
+  heo: {
+    body:'#F9B8C4', belly:'#FFD6DD', dark:'#E58FA0', leg:'#F9B8C4', paw:'#E58FA0',
+    tail:'<g class="m-tail"><path d="M15 34 C9 34 8 28 11.5 27.5 C14.5 27 14 31 11.5 30.6" fill="none" stroke="#E58FA0" stroke-width="2.2" stroke-linecap="round"/></g>',
+    earB:'<g class="m-ear"><path d="M40.5 22 Q38.5 9 49 16.5Z" fill="#E58FA0"/></g><g class="m-ear"><path d="M49.5 16 Q58.5 8 58 22Z" fill="#E58FA0"/></g>',
+    face:'<circle cx="52.5" cy="31.5" r="2.4" fill="#F27F98" opacity=".5"/>' +
+         '<rect x="54.5" y="26" width="8.6" height="8.6" rx="4" fill="#F27F98"/>' +
+         '<ellipse cx="60.6" cy="29.2" rx=".9" ry="1.5" fill="#B5465F"/><ellipse cx="60.6" cy="32.2" rx=".9" ry="1.5" fill="#B5465F"/>'
+  }
+};
+
+// 🐐 DÊ BÉO (Mùi): dùng lại đầu/sừng/râu của "de", chỉ đổi thân + chân + đuôi
+MASCOT_ART.de2 = Object.assign({}, MASCOT_ART.de, {
+  legH: 13,                                    // chân ngắn lại cho trông tròn
+  mark:
+    '<ellipse cx="30" cy="37" rx="21" ry="14.5" fill="#F3EFE7"/>' +        // thân to đè lên thân cũ
+    '<ellipse cx="30" cy="45" rx="14" ry="5.5" fill="#FFFFFF"/>' +         // bụng
+    '<ellipse cx="23" cy="31" rx="8" ry="4.6" fill="#B98B5A" opacity=".75"/>' +   // đốm nâu lưng
+    '<ellipse cx="38" cy="34" rx="4.6" ry="3" fill="#B98B5A" opacity=".75"/>',
+  tail: '<g class="m-tail fast"><path d="M13 32 L6 25 L16 29Z" fill="#F3EFE7" stroke="#CFC6B6" stroke-width=".8" stroke-linejoin="round"/></g>'
+});
+
+// ---------------------------------------------------------------------
+function _mNorm(s){
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').trim();
+}
+function _mKey(a){
+  const k = _mNorm(a);
+  return MASCOT_ART[k] ? k : (MASCOT_ALIAS[k] || 'meo');
+}
+
+function _mascotIsMobile(){
+  return window.matchMedia('(max-width: 768px)').matches ||
+         /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
+// Chỉ ID nằm trong MASCOT_CONFIG (hoặc bật AUTO_ALL_SALE) mới nhận được cấu hình.
+// Dùng hasOwnProperty để các ID như "constructor", "toString" không lọt qua.
+function _mascotPick(id){
+  if(Object.prototype.hasOwnProperty.call(MASCOT_CONFIG, id)) return MASCOT_CONFIG[id];
+  if(!MASCOT_AUTO_ALL_SALE) return null;
+  let h = 0;
+  for(let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  const names = Object.keys(MASCOT_ART);
+  return { animal: names[h % names.length] };
+}
+
+// ---------------------------------------------------------------------
+// TRẠNG THÁI + VÒNG LẶP CHUYỂN ĐỘNG (requestAnimationFrame)
+// ---------------------------------------------------------------------
+const _M = {
+  raf: 0, last: 0,
+  lane: null, run: null, art: null, cfg: null, size: 44,
+  x: 0, dir: 1, walk: 30,          // vị trí (trong panel) / hướng / tốc độ đi bộ
+  center: null,                    // tâm đi lại trong panel sau khi kéo thả (null = cả thanh)
+  free: null,                      // null = đang ở panel; {x,y,c} = đang đứng tự do ngoài panel
+  drag: null,                      // trạng thái đang kéo
+  roam: null, roamer: null, rdir: 1, busy: false,   // trạng thái chạy ăn mừng
+  obs: null, obsT: 0,              // theo dõi nút lưu đơn
+  bubble: null, hideT: 0, fadeT: 0,
+  paw: null, pickBack: null, nameEl: null, rg: null, pawT: '', pawOn: false, pawTry: 0,   // nút 🐾 + popup
+  animal: '', uid: ''              // con vật đang dùng / ID đang đăng nhập
+};
+
+function _mRand(a, b){ return a + Math.random() * (b - a); }
+
+function _mRange(){
+  return _M.lane ? Math.max(0, _M.lane.clientWidth - _M.size) : 0;
+}
+
+// Giới hạn đi lại khi đang ở trong panel
+function _mBounds(){
+  const range = _mRange();
+  if(_M.center == null || !MASCOT_PATROL_RADIUS) return { min: 0, max: range };
+  return {
+    min: Math.max(0, _M.center - MASCOT_PATROL_RADIUS),
+    max: Math.min(range, _M.center + MASCOT_PATROL_RADIUS)
+  };
+}
+
+// Giới hạn đi lại khi đang đứng tự do ngoài panel (đi ngang quanh chỗ thả)
+function _mFreeBounds(){
+  const maxX = Math.max(0, window.innerWidth - _M.size);
+  const R = MASCOT_PATROL_RADIUS || maxX;
+  return { min: Math.max(0, _M.free.c - R), max: Math.min(maxX, _M.free.c + R) };
+}
+
+// Con vật luôn nằm ở lớp fixed; vị trí tính theo toạ độ màn hình
+function _mRender(){
+  if(!_M.run || !_M.lane) return;
+  let px, py;
+  _M.run.style.display = '';
+  if(_M.drag){ px = _M.drag.px; py = _M.drag.py; }
+  else if(_M.free){ px = _M.free.x; py = _M.free.y; }
+  else {
+    const lr = _M.lane.getBoundingClientRect();
+    if(!lr.width){ _M.run.style.display = 'none'; return; }   // thanh nav đang ẩn
+    px = lr.left + _M.x; py = lr.bottom - _M.size;
+  }
+  _M.run.style.transform = 'translate3d(' + px.toFixed(1) + 'px,' + py.toFixed(1) + 'px,0) scaleX(' + _M.dir + ')';
+}
+
+function _mascotUpdateRange(){
+  if(!_M.lane) return;
+  const range = _mRange();
+  _M.walk = Math.max(18, range) / (((_M.cfg && _M.cfg.speed) || 18) / 2 * 0.96);
+  _M.x = Math.min(_M.x, range);
+  if(_M.center != null) _M.center = Math.min(_M.center, range);
+  if(_M.free){                                    // xoay màn hình / đổi cỡ: giữ con vật trong màn hình
+    const mx = Math.max(0, window.innerWidth - _M.size), my = Math.max(0, window.innerHeight - _M.size);
+    _M.free.x = Math.min(_M.free.x, mx);
+    _M.free.c = Math.min(_M.free.c, mx);
+    _M.free.y = Math.min(_M.free.y, my);
+  }
+  _mRender();
+}
+
+function _mTick(t){
+  _M.raf = requestAnimationFrame(_mTick);
+  const dt = Math.min(0.05, (t - (_M.last || t)) / 1000);
+  _M.last = t;
+
+  if(_M.roam){
+    _mStepRoam(dt);
+  } else if(!_M.drag){
+    if(_M.free){
+      const b = _mFreeBounds();
+      _M.free.x += _M.dir * _M.walk * dt;
+      if(_M.free.x >= b.max){ _M.free.x = b.max; _M.dir = -1; }
+      else if(_M.free.x <= b.min){ _M.free.x = b.min; _M.dir = 1; }
+    } else {
+      const b = _mBounds();
+      _M.x += _M.dir * _M.walk * dt;
+      if(_M.x >= b.max){ _M.x = b.max; _M.dir = -1; }
+      else if(_M.x <= b.min){ _M.x = b.min; _M.dir = 1; }
+    }
+    _mRender();
+  }
+  if(_M.bubble && _M.bubble.classList.contains('show')) _mPlaceBubble();
+  _mPlacePaw();
+}
+
+// ---------------------------------------------------------------------
+// 1) KÉO THẢ: nhấp giữ -> kéo đi đâu cũng được -> thả
+//    Thả trên thanh panel: vào lại panel. Thả ra ngoài: đứng đó, đi qua đi lại.
+// ---------------------------------------------------------------------
+function _mBindDrag(run){
+  run.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+
+  run.addEventListener('pointerdown', function(e){
+    if(_M.roam) return;
+    e.preventDefault();
+    try { run.setPointerCapture(e.pointerId); } catch(err){}
+    const r = run.getBoundingClientRect();
+    _M.drag = { offX: e.clientX - r.left, offY: e.clientY - r.top, lastX: e.clientX, px: r.left, py: r.top };
+    run.classList.add('m-drag');
+  });
+
+  run.addEventListener('pointermove', function(e){
+    const d = _M.drag;
+    if(!d) return;
+    d.px = Math.max(0, Math.min(window.innerWidth  - _M.size, e.clientX - d.offX));
+    d.py = Math.max(0, Math.min(window.innerHeight - _M.size, e.clientY - d.offY));
+    if(Math.abs(e.clientX - d.lastX) > 1){
+      _M.dir = (e.clientX > d.lastX) ? 1 : -1;      // quay mặt theo hướng kéo
+      d.lastX = e.clientX;
+    }
+    _mRender();
+  });
+
+  const drop = function(){
+    const d = _M.drag;
+    if(!d) return;
+    _M.drag = null;
+    run.classList.remove('m-drag');
+    const nav = _M.lane.parentNode.getBoundingClientRect();
+    const lr  = _M.lane.getBoundingClientRect();
+    const cy  = d.py + _M.size / 2;
+    if(lr.width && cy >= nav.top && cy <= nav.bottom){   // thả trên thanh nav -> vào lại panel
+      _M.free = null;
+      _M.x = Math.max(0, Math.min(_mRange(), d.px - lr.left));
+      _M.center = _M.x;
+    } else {                                             // thả ra ngoài -> đứng đó, đi lại quanh đó
+      _M.free = { x: d.px, y: d.py, c: d.px };
+    }
+    _mRender();
+  };
+  run.addEventListener('pointerup', drop);
+  run.addEventListener('pointercancel', drop);
+}
+
+// ---------------------------------------------------------------------
+// 2) CHẠY ĂN MỪNG KHI LÊN ĐƠN
+// ---------------------------------------------------------------------
+function _mPlaceBubble(){
+  const b = _M.bubble;
+  if(!b) return;
+  let r;
+  if(_M.roam){            // bám theo vị trí tính toán (kể cả lúc nhảy), không bị giật khi xoay
+    r = { left: _M.roam.x + (_M.roam.ox || 0), top: _M.roam.y + (_M.roam.oy || 0), width: _M.size, height: _M.size };
+  } else {
+    if(!_M.run) return;
+    r = _M.run.getBoundingClientRect();
+  }
+  const dir = _M.roam ? _M.rdir : _M.dir;
+  const bw = b.offsetWidth, bh = b.offsetHeight;
+  const mx = r.left + r.width * (dir > 0 ? 0.92 : 0.08);
+  const my = r.top + r.height * 0.42;
+  let left = dir > 0 ? mx - bw * 0.72 : mx - bw * 0.28;
+  left = Math.max(4, Math.min(window.innerWidth - bw - 4, left));
+  const top = Math.max(4, my - bh - 10);
+  const tail = Math.max(14, Math.min(bw - 14, mx - left));
+  b.style.setProperty('--tail', tail + 'px');
+  b.style.transform = 'translate3d(' + left.toFixed(1) + 'px,' + top.toFixed(1) + 'px,0)';
+}
+function _mShowBubble(text){
+  clearTimeout(_M.hideT); clearTimeout(_M.fadeT);
+  if(!_M.bubble){
+    _M.bubble = document.createElement('div');
+    _M.bubble.id = 'mascotBubble';
+    document.body.appendChild(_M.bubble);
+  }
+  _M.bubble.textContent = text;
+  _M.bubble.classList.add('show');
+  _mPlaceBubble();
+}
+
+function _mHideBubble(delay){
+  clearTimeout(_M.hideT);
+  _M.hideT = setTimeout(function(){
+    if(_M.bubble) _M.bubble.classList.remove('show');
+    _M.fadeT = setTimeout(function(){
+      if(_M.bubble){ _M.bubble.remove(); _M.bubble = null; }
+    }, 320);
+  }, delay);
+}
+
+// Chỉ chạy được khi tài khoản có linh vật (_M.run chỉ tồn tại với ID được chỉ định)
+// Tạo lộ trình theo hành động. Điểm có "hold" = đến nơi thì đứng lại làm hiệu ứng (fx) trong hold giây
+function _mBuildRoute(act, W, H, size, x0, y0){
+  const pts = [];
+  const cx = (W - size) / 2, cy = Math.max(4, (H - size) / 2);
+
+  if(act === 'zigzag'){                              // quét ngang màn hình từ trên xuống
+    const rows = 5, L = 4, R = Math.max(5, W - size - 4);
+    const gap = Math.max(0, H - size - 8) / (rows - 1);
+    const startRight = Math.random() < 0.5;
+    for(let i = 0; i < rows; i++){
+      const right = (i % 2 === 0) ? startRight : !startRight;
+      pts.push({ x: right ? R : L, y: 4 + i * gap, s: 1.25 });
+    }
+  } else if(act === 'jump'){                         // chạy ra giữa rồi nhảy 3 cái
+    pts.push({ x: cx, y: cy, s: 1.1, hold: 1.8, fx: 'jump' });
+  } else if(act === 'spin'){                         // chạy ra giữa rồi xoay tít 3 vòng
+    pts.push({ x: cx, y: cy, s: 1.1, hold: 1.6, fx: 'spin' });
+  } else if(act === 'dance'){                        // chạy ra giữa rồi lắc lư nhún nhảy
+    pts.push({ x: cx, y: cy, s: 1.1, hold: 2.2, fx: 'dance' });
+  } else {                                           // 'run': chạy ngẫu nhiên MASCOT_ROAM_LAPS vòng
+    const total = MASCOT_ROAM_LAPS * MASCOT_ROAM_POINTS;
+    let px = x0, py = y0;
+    for(let i = 0; i < total; i++){
+      let nx, ny, tries = 0;
+      do {
+        nx = _mRand(4, Math.max(5, W - size - 4));
+        ny = _mRand(4, Math.max(5, H - size - 4));
+        tries++;
+      } while(Math.hypot(nx - px, ny - py) < Math.min(W, H) * 0.35 && tries < 12);
+      pts.push({ x: nx, y: ny, s: _mRand(0.85, 1.15) });
+      px = nx; py = ny;
+    }
+  }
+  return pts;
+}
+
+// text: lời thoại (tuỳ chọn) | act: ép 1 hành động để thử, vd mascotCelebrate('', 'spin')
+function mascotCelebrate(text, act){
+  if(!_M.run || _M.busy || _M.drag) return;
+  if(_M.run.style.display === 'none') return;
+  _M.busy = true;
+
+  if(MASCOT_ACTIONS.indexOf(act) < 0){               // bốc ngẫu nhiên, tránh trùng lần trước
+    const pool = MASCOT_ACTIONS.filter(function(a){ return a !== _mLastAct; });
+    act = pool[Math.floor(Math.random() * pool.length)];
+  }
+  _mLastAct = act;
+
+  const size = _M.size;
+  const r0 = _M.run.getBoundingClientRect();
+
+  const rm = document.createElement('div');
+  rm.id = 'mascotRoamer';
+  rm.style.setProperty('--m-size', size + 'px');
+  rm.innerHTML = '<div class="mBody">' + _mAnimalSVG(_M.art) + '</div>';
+  document.body.appendChild(rm);
+  _M.roamer = rm;
+  _M.run.style.visibility = 'hidden';
+
+  const pts = _mBuildRoute(act, window.innerWidth, window.innerHeight, size, r0.left, r0.top);
+
+  _M.rdir = _M.dir;
+  _M.roam = { x: r0.left, y: r0.top, i: 0, pts: pts, hold: 0, holdTotal: 1, fx: '', ox: 0, oy: 0, act: act };
+  _mApplyRoam(r0.left, r0.top, 0, 1);
+  _mShowBubble(text || MASCOT_ROAM_TEXT);
+}
+
+function _mApplyRoam(x, y, rot, sc){
+  if(!_M.roamer) return;
+  _M.roamer.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0) rotate(' +
+    rot.toFixed(1) + 'deg) scale(' + (_M.rdir * sc).toFixed(3) + ',' + sc.toFixed(3) + ')';
+}
+
+function _mStepRoam(dt){
+  const r = _M.roam;
+  if(!r || !_M.roamer) return;
+
+  // Đang đứng lại làm hiệu ứng (nhảy / xoay / lắc)
+  if(r.hold > 0){
+    r.hold -= dt;
+    const p = 1 - Math.max(0, r.hold) / r.holdTotal;      // tiến độ 0 -> 1
+    let ox = 0, oy = 0, rot = 0, sc = 1;
+    if(r.fx === 'jump'){                                   // 3 cú nhảy cao
+      oy = -Math.abs(Math.sin(p * Math.PI * 3)) * Math.min(110, window.innerHeight * 0.25);
+    } else if(r.fx === 'spin'){                            // xoay 3 vòng, hơi bay lên
+      rot = p * 360 * 3;
+      oy = -Math.sin(p * Math.PI) * 30;
+    } else if(r.fx === 'dance'){                           // lắc qua lắc lại + nhún to nhỏ
+      const w = Math.sin(p * Math.PI * 8);
+      rot = w * 18; sc = 1 + Math.abs(w) * 0.15; ox = w * 8;
+    }
+    r.ox = ox; r.oy = oy;
+    if(r.hold <= 0){ r.ox = 0; r.oy = 0; r.i++; rot = 0; sc = 1; ox = 0; oy = 0; }
+    _mApplyRoam(r.x + ox, r.y + oy, rot, sc);
+    return;
+  }
+
+  let tx, ty, sp;
+  if(r.i < r.pts.length){
+    tx = r.pts[r.i].x; ty = r.pts[r.i].y; sp = MASCOT_ROAM_SPEED * r.pts[r.i].s;
+  } else {                                                 // chặng cuối: chạy về chỗ cũ
+    const q = _M.run.getBoundingClientRect();
+    tx = q.left; ty = q.top; sp = MASCOT_ROAM_SPEED;
+  }
+  const dx = tx - r.x, dy = ty - r.y, d = Math.hypot(dx, dy), step = sp * dt;
+  if(Math.abs(dx) > 1.5) _M.rdir = dx > 0 ? 1 : -1;
+
+  if(d <= step){
+    r.x = tx; r.y = ty;
+    if(r.i >= r.pts.length){ _mFinishRoam(); return; }
+    const pt = r.pts[r.i];
+    if(pt.hold){ r.hold = pt.hold; r.holdTotal = pt.hold; r.fx = pt.fx; }   // đến nơi -> làm hiệu ứng
+    else r.i++;
+  } else {
+    r.x += dx / d * step;
+    r.y += dy / d * step;
+  }
+  _mApplyRoam(r.x, r.y, 0, 1);
+}
+
+function _mFinishRoam(){
+  if(_M.roamer){ _M.roamer.remove(); _M.roamer = null; }
+  if(_M.run) _M.run.style.visibility = '';
+  _M.dir = _M.rdir;
+  _M.roam = null;
+  _M.busy = false;
+  _mRender();
+  _mHideBubble(MASCOT_BUBBLE_STAY);              // bong bóng còn ở lại miệng một lúc rồi mờ dần
+}
+
+// Bắt nút "XÁC NHẬN LƯU ĐƠN": chữ nút đổi "Đang lưu..." -> "✔ XÁC NHẬN LƯU ĐƠN" khi server lưu xong.
+// (Cách chính xác hơn: gọi mascotCelebrate() trong hàm xử lý THÀNH CÔNG của lệnh lưu đơn ở script chính.
+//  Có cờ busy nên gọi cả hai cách cũng không chạy 2 lần.)
+function _mWatchSave(){
+  if(_M.obs) return;
+  const btn = document.getElementById('btnSubmitOrder');
+  if(!btn){ _M.obsT = setTimeout(_mWatchSave, 1500); return; }   // nút chưa có thì đợi rồi thử lại
+  let saving = false;
+  _M.obs = new MutationObserver(function(){
+    const txt = btn.textContent || '';
+    if(txt.indexOf('Đang lưu') >= 0){ saving = true; return; }
+    if(saving){ saving = false; setTimeout(function(){ mascotCelebrate(); }, 300); }
+  });
+  _M.obs.observe(btn, { childList: true, characterData: true, subtree: true });
+}
+
+// ---------------------------------------------------------------------
+// 3) NÚT 🐾 ĐỔI LINH VẬT
+//    Chỉ ID có linh vật mới có nút. Bấm -> popup 12 con giáp -> chọn là đổi ngay.
+//    Lựa chọn được nhớ theo ID trên chính thiết bị này (localStorage).
+// ---------------------------------------------------------------------
+const MASCOT_PICK_LIST = ['chuot','trau','cop','meo','rong','ran','ngua','de','de2','khi','ga','cho','heo'];   // 12 con giáp + dê béo
+// Nếu nút 🐾 không bám đúng sau tên: điền selector của phần tử chứa tên, vd '#navUserName' hoặc '.nav-name'
+const MASCOT_NAME_SELECTOR = '';
+const MASCOT_SAVE_PREFIX = 'mascot_pick_';
+
+function _mHas(o, k){ return Object.prototype.hasOwnProperty.call(o, k); }
+
+function _mLoadPick(id){
+  try { const k = localStorage.getItem(MASCOT_SAVE_PREFIX + id); return (k && _mHas(MASCOT_ART, k)) ? k : ''; }
+  catch(e){ return ''; }
+}
+function _mSavePick(id, key){
+  try { localStorage.setItem(MASCOT_SAVE_PREFIX + id, key); } catch(e){}
+}
+
+// Tìm phần tử chứa tên người dùng: chữ đầu tiên (không nằm trong nút bấm) trên thanh nav
+function _mFindNameEl(nav){
+  if(MASCOT_NAME_SELECTOR){
+    const el = nav.querySelector(MASCOT_NAME_SELECTOR);
+    if(el) return el;
+  }
+  const all = nav.querySelectorAll('*');
+  for(let i = 0; i < all.length; i++){
+    const el = all[i];
+    if(el.children.length || !(el.textContent || '').trim()) continue;   // chỉ lấy phần tử lá có chữ
+    if(el.closest('button, a, .btn, #mascotLane')) continue;             // bỏ qua nút (☰, Làm mới, đăng xuất...)
+    if(!el.getClientRects().length) continue;                            // bỏ qua phần tử đang ẩn
+    return el;
+  }
+  return null;
+}
+
+function _mPawHide(){
+  if(_M.paw && _M.pawOn){ _M.paw.style.display = 'none'; _M.pawOn = false; }
+}
+
+// Chạy mỗi khung hình: đặt nút 🐾 ngay bên phải chữ tên (theo bề rộng chữ thật)
+function _mPlacePaw(){
+  const p = _M.paw;
+  if(!p || !_M.lane) return;
+  const nav = _M.lane.parentNode;
+  const nb = nav.getBoundingClientRect();
+  if(!nb.width || !nb.height){ _mPawHide(); return; }               // thanh nav đang ẩn
+
+  if(!_M.nameEl || !_M.nameEl.isConnected){
+    _M.nameEl = (_M.pawTry++ % 30 === 0) ? _mFindNameEl(nav) : null; // không thấy thì thử lại thưa thưa
+  }
+  const n = _M.nameEl;
+  if(!n){ _mPawHide(); return; }
+
+  if(!_M.rg) _M.rg = document.createRange();
+  _M.rg.selectNodeContents(n);
+  const tr = _M.rg.getBoundingClientRect(), nr = n.getBoundingClientRect();
+  if(!nr.width && !tr.width){ _mPawHide(); return; }
+  const right = tr.width ? Math.min(tr.right, nr.right || tr.right) : nr.right;
+  const top = tr.height ? tr.top + (tr.height - 28) / 2 : nr.top + (nr.height - 28) / 2;
+  const x = Math.min(right + 6, window.innerWidth - 32);
+
+  const t = 'translate3d(' + x.toFixed(1) + 'px,' + top.toFixed(1) + 'px,0)';
+  if(t !== _M.pawT){ p.style.transform = t; _M.pawT = t; }
+  if(!_M.pawOn){ p.style.display = 'block'; _M.pawOn = true; }
+}
+
+function _mMountPaw(){
+  const p = document.createElement('button');
+  p.id = 'mascotPaw';
+  p.type = 'button';
+  p.textContent = '🐾';
+  p.setAttribute('aria-label', 'Đổi linh vật');
+  p.addEventListener('click', function(e){
+    e.stopPropagation();
+    if(_M.pickBack) _mClosePicker(); else _mOpenPicker();
+  });
+  document.body.appendChild(p);
+  _M.paw = p;
+}
+
+// Đổi con vật đang chạy (kể cả khi đang chạy ăn mừng)
+function _mSetAnimal(key, save){
+  key = _mKey(key);
+  _M.animal = key;
+  _M.art = MASCOT_ART[key];
+  const html = '<div class="mBody">' + _mAnimalSVG(_M.art) + '</div>';
+  if(_M.run) _M.run.innerHTML = html;
+  if(_M.roamer) _M.roamer.innerHTML = html;
+  if(save) _mSavePick(_M.uid, key);
+}
+
+function _mOpenPicker(){
+  if(_M.pickBack || !_M.run || !_M.lane) return;
+  const nav = _M.lane.parentNode.getBoundingClientRect();
+  const back = document.createElement('div');
+  back.id = 'mascotPickBack';
+  back.style.paddingTop = Math.max(8, nav.bottom + 8) + 'px';
+
+  let h = '<div id="mascotPicker" role="dialog" aria-label="Chọn linh vật">' +
+          '<div class="mpHead"><span>🐾 Chọn linh vật của bạn</span>' +
+          '<button type="button" class="mpX" aria-label="Đóng">✕</button></div><div class="mpGrid">';
+  MASCOT_PICK_LIST.forEach(function(k){
+    const nm = MASCOT_NAMES[k].split(' (');
+    const on = (k === _M.animal);
+    h += '<button type="button" class="mpItem' + (on ? ' on' : '') + '" data-k="' + k + '">' +
+         '<div class="mBody">' + _mAnimalSVG(MASCOT_ART[k]) + '</div>' + nm[0] +
+         '<small>' + (nm[1] || '').replace(')', '') + '</small></button>';
+  });
+  back.innerHTML = h + '</div></div>';
+
+  back.addEventListener('click', function(e){
+    if(e.target === back || e.target.closest('.mpX')){ _mClosePicker(); return; }
+    const it = e.target.closest('.mpItem');
+    if(it) _mChoose(it.getAttribute('data-k'));
+  });
+  document.body.appendChild(back);
+  _M.pickBack = back;
+  requestAnimationFrame(function(){ back.classList.add('show'); });
+}
+
+function _mClosePicker(){
+  const b = _M.pickBack;
+  if(!b) return;
+  _M.pickBack = null;
+  b.classList.remove('show');
+  setTimeout(function(){ b.remove(); }, 200);
+}
+
+function _mChoose(key){
+  if(!_mHas(MASCOT_ART, key)) return;
+  _mSetAnimal(key, true);
+  if(_M.pickBack){
+    _M.pickBack.querySelectorAll('.mpItem').forEach(function(b){
+      b.classList.toggle('on', b.getAttribute('data-k') === key);
+    });
+  }
+  const nm = MASCOT_NAMES[key].split(' (')[0];
+  setTimeout(function(){
+    _mClosePicker();
+    if(_M.run && !_M.busy){ _mShowBubble('Mình là ' + nm + ' nè! 🐾'); _mHideBubble(1800); }
+  }, 260);
+}
+
+// ---------------------------------------------------------------------
+function removeMascot(){
+  cancelAnimationFrame(_M.raf);
+  clearTimeout(_M.hideT); clearTimeout(_M.fadeT); clearTimeout(_M.obsT);
+  if(_M.obs){ _M.obs.disconnect(); _M.obs = null; }
+  if(_M.roamer) _M.roamer.remove();
+  if(_M.bubble) _M.bubble.remove();
+  if(_M.run) _M.run.remove();
+  if(_M.paw) _M.paw.remove();
+  if(_M.pickBack) _M.pickBack.remove();
+  _M.paw = null; _M.pickBack = null; _M.nameEl = null; _M.pawT = ''; _M.pawOn = false; _M.pawTry = 0;
+  const lane = document.getElementById('mascotLane');
+  if(lane) lane.remove();
+  window.removeEventListener('resize', _mascotUpdateRange);
+  _M.raf = 0; _M.lane = null; _M.run = null; _M.roamer = null; _M.bubble = null;
+  _M.roam = null; _M.drag = null; _M.busy = false; _M.center = null; _M.free = null;
+}
+
+function initMascot(){
+  removeMascot();                                   // tránh tạo trùng khi đăng nhập lại
+  if(typeof user === 'undefined' || !user) return;
+
+  const id = String(user.userId || '').trim().toLowerCase();
+
+  if(!_mascotIsMobile()) return;                    // chỉ điện thoại
+  const cfg = _mascotPick(id);
+  if(!cfg) return;                                  // ID không được chỉ định -> không có gì hết
+
+  const nav = document.querySelector('.top-nav');
+  if(!nav) return;
+
+  const key = _mKey(_mLoadPick(id) || cfg.animal);   // ưu tiên con đã chọn bằng nút 🐾
+  const art = MASCOT_ART[key];
+
+  const lane = document.createElement('div');       // lane rỗng, chỉ giữ chỗ trên thanh panel
+  lane.id = 'mascotLane';
+  nav.appendChild(lane);
+
+  const run = document.createElement('div');        // con vật nằm ở lớp fixed của trang
+  run.id = 'mascotRunner';
+  run.style.setProperty('--m-size', (cfg.size || 44) + 'px');
+  run.innerHTML = '<div class="mBody">' + _mAnimalSVG(art) + '</div>';
+  document.body.appendChild(run);
+
+  _M.lane = lane; _M.run = run; _M.art = art; _M.cfg = cfg;
+  _M.animal = key; _M.uid = id;
+  _M.size = cfg.size || 44;
+  _M.x = 0; _M.dir = 1; _M.center = null; _M.free = null; _M.last = 0;
+
+  _mBindDrag(run);
+  _mascotUpdateRange();
+  window.addEventListener('resize', _mascotUpdateRange);
+  _M.raf = requestAnimationFrame(_mTick);
+  _mWatchSave();                                    // chỉ gắn cho ID được chỉ định
+  _mMountPaw();                                     // nút 🐾 đổi linh vật (cũng chỉ cho ID được chỉ định)
+}
+
+// Xem thử tất cả linh vật (gõ mascotDemo() trong Console, bấm vào màn hình để đóng)
+// Chỉ tài khoản có linh vật mới mở được.
+function mascotDemo(){
+  if(!_M.run) return;
+  const old = document.getElementById('mascotDemo');
+  if(old){ old.remove(); return; }
+  const w = document.createElement('div');
+  w.id = 'mascotDemo';
+  w.style.cssText = 'position:fixed;inset:0;z-index:100010;background:#fff;overflow:auto;display:grid;' +
+                    'grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;padding:16px;align-content:start';
+  w.innerHTML = Object.keys(MASCOT_ART).map(function(k){
+    return '<div style="text-align:center;font:600 13px sans-serif;color:#222">' +
+           '<div class="mBody" style="width:96px;height:96px;margin:0 auto 6px">' + _mAnimalSVG(MASCOT_ART[k]) + '</div>' +
+           MASCOT_NAMES[k] + '<br><small style="font-weight:400;color:#888">' + k + '</small></div>';
+  }).join('');
+  w.onclick = function(){ w.remove(); };
+  document.body.appendChild(w);
+}
+</script>
