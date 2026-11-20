@@ -1,65 +1,2348 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Quản Lý Ánh Dương - Thiết Bị Kim Khí</title>
-  <link rel="stylesheet" href="css/app.css" />
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ánh Dương - Hệ Thống Quản Lý</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    :root {
+      --pri:#1a56db;--pri-dk:#1342b0;--pri-lt:#e8f0fe;
+      --suc:#0e9f6e;--suc-lt:#e8f5f0;
+      --warn:#d97706;--warn-lt:#fef3c7;
+      --dan:#e02424;--dan-lt:#fde8e8;
+      --info:#0694a2;--info-lt:#e0f5f5;
+      --fin:#2563eb;--fin-lt:#dbeafe;
+      --bg:#f5f7fa;--surf:#fff;--bdr:#e5e7eb;
+      --txt:#111827;--muted:#6b7280;--lt:#9ca3af;
+      --rad:10px;--rad-lg:14px;
+      --nav-h:56px;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--txt);font-size:13px;font-family:'Segoe UI',sans-serif;overflow-x:hidden;}
+
+    .top-nav{background:var(--pri);color:#fff;height:var(--nav-h);display:flex;align-items:center;padding:0 14px;gap:10px;position:fixed;top:0;left:0;right:0;z-index:200;box-shadow:0 2px 12px rgba(0,0,0,.2);}
+    .brand{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+    .brand-logo{width:34px;height:34px;background:rgba(255,255,255,.15);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+    .brand-text{line-height:1.3;}
+    .brand-name{font-weight:700;font-size:15px;display:block;}
+    .brand-user{font-size:11px;color:rgba(255,255,255,.65);}
+    
+    .nav-btn{background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);color:#fff;padding:6px 12px;border-radius:20px;cursor:pointer;font-size:12px;font-weight:600;transition:.2s;display:flex;align-items:center;gap:5px;white-space:nowrap;}
+    .nav-btn:hover{background:rgba(255,255,255,.28);}
+    .nav-btn.red{background:rgba(220,38,38,.35);border-color:rgba(220,38,38,.5);}
+    .hamburger{background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);color:#fff;width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;transition:.2s;flex-shrink:0;}
+    .hamburger:hover{background:rgba(255,255,255,.28);}
+    
+    .admin-nav-menu { display: none; flex: 1; justify-content: center; align-items: center; gap: 4px; }
+    .admin-dropdown { position: relative; display: inline-block; }
+    .admin-menu-btn { background: transparent; border: none; color: #fff; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; white-space: nowrap; transition: 0.2s; display: flex; align-items: center; gap: 6px; }
+    .admin-menu-btn:hover { background: rgba(255,255,255,0.2); }
+    .admin-dropdown-content { display: none; position: absolute; top: 100%; left: 0; background: #1e3a8a; min-width: 200px; box-shadow: 0 10px 25px rgba(0,0,0,0.25); border-radius: 12px; z-index: 300; padding: 8px 0; margin-top: 6px; border: 1px solid rgba(255,255,255,0.1); }
+    .admin-dropdown-content::before { content: ''; position: absolute; top: -10px; left: 0; right: 0; height: 10px; }
+    .admin-dropdown-content a { color: #fff; padding: 12px 18px; text-decoration: none; display: block; font-size: 14px; font-weight: 500; transition: background 0.2s; cursor: pointer; }
+    .admin-dropdown-content a:hover { background: #2563eb; color: #fff; padding-left: 22px; }
+    .admin-dropdown.show .admin-dropdown-content { display: block; }
+
+    .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;}
+    .overlay.show{display:block;}
+    .sidebar{position:fixed;top:0;left:-280px;width:280px;height:100vh;background:var(--surf);z-index:400;transition:.3s cubic-bezier(.4,0,.2,1);overflow-y:auto;display:flex;flex-direction:column;}
+    .sidebar.show{left:0;box-shadow:4px 0 20px rgba(0,0,0,.15);}
+    .sb-head{background:linear-gradient(160deg,#0f2d7a,var(--pri));padding:20px 16px 16px;color:#fff;}
+    .sb-logo{font-size:28px;margin-bottom:6px;}
+    .sb-title{font-weight:700;font-size:16px;}
+    .sb-sub{font-size:12px;color:rgba(255,255,255,.7);}
+
+    .sb-grp{border-bottom:1px solid rgba(255,255,255,.07);}
+    .sb-grp-hdr{ display:flex;align-items:center;justify-content:space-between; padding:10px 16px 8px;cursor:pointer;user-select:none; transition:background .15s; }
+    .sb-grp-hdr:hover{background:rgba(0,0,0,.04);}
+    .sb-grp-label{ font-size: 11.5px; font-weight: 800; color: #1f2937; text-transform: uppercase; letter-spacing: .5px; display: flex; align-items: center; gap: 8px; }
+    .sb-grp-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+    .dot-blue{background:#3b82f6;} .dot-amber{background:#f59e0b;}
+    .dot-teal{background:#10b981;} .dot-purple{background:#8b5cf6;}
+    .sb-grp-badge{ background:var(--dan-lt);color:var(--dan); font-size:9px;padding:1px 7px;border-radius:10px;font-weight:700; }
+    .sb-chevron{ color: #4b5563; font-size: 12px; transition: transform .25s cubic-bezier(.4,0,.2,1); line-height: 1; }
+    .sb-chevron.open{transform:rotate(180deg);}
+
+    .sb-items{ overflow:hidden;transition:max-height .3s cubic-bezier(.4,0,.2,1),opacity .25s; max-height:0;opacity:0; }
+    .sb-items.open{max-height:400px;opacity:1;}
+
+    .sb-item{ display: flex; align-items: center; gap: 12px; padding: 10px 16px 10px 24px; cursor: pointer; color: #1f2937; font-size: 13.5px; font-weight: 600; transition: .15s; border-left: 3px solid transparent; position: relative; }
+    .sb-item:hover{background:rgba(0,0,0,.04);color:var(--pri);} 
+    .sb-item.active{background:var(--pri-lt);color:var(--pri);border-left-color:var(--pri);} 
+
+    .sb-item.xuly-item { color: #1f2937; } 
+    .sb-item.xuly-item:hover { background: rgba(139, 92, 246, 0.08); color: #7c3aed; }
+    .sb-item.xuly-item.active { border-left-color: #8b5cf6; background: #ede9fe; color: #7c3aed; font-weight: 700; }
+    .sb-item.xuly-item .sb-icon { background: #ede9fe; color: #8b5cf6; } 
+    .sb-item.xuly-item.active .sb-icon { background: #8b5cf6; color: #fff; }
+    .sb-badge{ margin-left:auto;background:var(--dan);color:#fff; font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px; }
+    .sb-close{padding:14px 16px;border-top:1px solid rgba(255,255,255,.1);margin-top:auto;}
+
+    .main-wrap{padding-top:var(--nav-h);}
+    .page{display:none;padding:14px;animation:fadeIn .18s ease;}
+    .page.active{display:block;}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+
+    .card{background:var(--surf);border-radius:var(--rad-lg);border:1px solid var(--bdr);padding:14px;margin-bottom:12px;}
+    .sec-head{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--bdr);}
+
+    .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+    .stat-card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rad-lg);padding:11px 12px;}
+    .slabel{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+    .sval{font-size:20px;font-weight:700;line-height:1;}.ssub{font-size:11px;color:var(--muted);margin-top:3px;}
+
+    .badge-s{display:inline-flex;align-items:center;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800;letter-spacing:0.3px;box-shadow:0 1px 2px rgba(0,0,0,0.05);}
+    .bwait{background:#d97706;color:#ffffff;border:1px solid #b45309;} 
+    .bdxl{background:#1e3a8a;color:#ffffff;border:1px solid #1e3a8a;} /* CHÈN DÒNG NÀY */
+    .bdone{background:#059669;color:#ffffff;border:1px solid #047857;} 
+    .bfin{background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;}
+    .bprint{background:#f3f4f6;color:#374151;border:1px solid #d1d5db;}
+
+    .finput{width:100%;padding:9px 12px;border:1.5px solid var(--bdr);border-radius:8px;font-size:16px;color:var(--txt);background:var(--surf);transition:.15s;outline:none;}
+    @media(min-width:480px){.finput{font-size:13px;}}
+    .finput:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(26,86,219,.1);}
+    .fselect{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b7280' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;}
+
+    .btn2{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:.15s;}
+    .btn2:active{transform:scale(.98);}
+    .btn-pri{background:var(--pri);color:#fff;border-color:var(--pri);}.btn-pri:hover{background:var(--pri-dk);}
+    .btn-suc{background:var(--suc);color:#fff;border-color:var(--suc);}
+    .btn-out{background:transparent;border-color:var(--bdr);color:var(--txt);}.btn-out:hover{border-color:var(--pri);color:var(--pri);}
+    .btn-warn{background:var(--warn);color:#fff;border-color:var(--warn);}
+    .btn-dng{background:var(--dan);color:#fff;border-color:var(--dan);}
+    .btn-fin{background:var(--fin);color:#fff;border-color:var(--fin);}
+    .btn-sm2{padding:4px 9px;font-size:11px;border-radius:6px;}
+    .btn-full{width:100%;}
+
+    .search-res{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rad);overflow-y:auto;max-height:280px;margin-top:4px;box-shadow:0 4px 12px rgba(0,0,0,.08);}
+    .sr-item{padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;transition:.12s;}
+    .sr-item:last-child{border-bottom:none;}.sr-item:hover{background:var(--pri-lt);}
+    .stk{font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;}
+    .stk-ok{background:#d1fae5;color:#065f46;}.stk-low{background:#fef3c7;color:#92400e;}.stk-out{background:var(--dan-lt);color:var(--dan);}
+
+    .cart-item{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rad);padding:10px 12px;margin-bottom:8px;border-left:4px solid var(--pri);position:relative;}
+    .ci-name{font-weight:700;font-size:13px;margin-bottom:8px;padding-right:30px;}
+    .ci-grid{display:grid;grid-template-columns:65px 1.2fr 50px 1.5fr auto;gap:6px;align-items:center;}
+    .ci-inp{padding:6px 8px;border:1.5px solid var(--bdr);border-radius:6px;font-size:13px;font-weight:700;text-align:center;color:var(--pri);outline:none;width:100%;cursor:text;-webkit-user-select:text;user-select:text;}
+    .ci-inp:focus{border-color:var(--pri);box-shadow:0 0 0 2px rgba(26,86,219,.15);}
+    .ci-inp.over-stock{border-color:var(--dan);background:var(--dan-lt);color:var(--dan);}
+    .ci-price{font-weight:700;color:var(--dan);font-size:13px;text-align:right;}
+    .ci-rm{width:26px;height:26px;border-radius:50%;background:var(--dan-lt);border:none;color:var(--dan);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:.15s;}
+    .ci-rm:hover{background:var(--dan);color:#fff;}
+    .ci-head{display:grid;grid-template-columns:65px 1.2fr 50px 1.5fr auto;gap:6px;padding:0 4px;margin-bottom:6px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;}
+    .stk-warn{font-size:10px;color:var(--warn);font-weight:600;margin-top:3px;}
+    .stk-err{font-size:10px;color:var(--dan);font-weight:700;margin-top:3px;}
+
+    .total-bar{background:var(--surf);border:2px solid var(--pri);border-radius:var(--rad-lg);padding:14px;margin-top:10px;}
+    .total-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+    .total-amt{font-size:22px;font-weight:700;color:var(--dan);}
+
+    .addr-box{padding:8px 12px;background:var(--suc-lt);border-radius:8px;border-left:3px solid var(--suc);font-size:12px;color:#065f46;margin-bottom:10px;}
+
+    .order-card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rad-lg);padding:12px;margin-bottom:8px;cursor:pointer;transition:.15s;border-left:4px solid var(--bdr);}
+    .order-card:hover{border-color:var(--pri);box-shadow:0 2px 10px rgba(26,86,219,.1);}
+    .order-card.fin{border-left-color:var(--fin);}
+    .order-card.wait{border-left-color:var(--warn);}
+    .order-card.done{border-left-color:var(--suc);}
+    .ocust{font-weight:700;font-size:14px;}.oid{font-size:11px;color:var(--muted);font-weight:600;}
+    .oaddr{font-size:12px;color:var(--muted);margin:3px 0;}
+    .oprev{font-size:11px;color:#495057;background:var(--bg);padding:5px 8px;border-radius:6px;margin-bottom:6px;font-family:monospace;white-space:pre-wrap;}
+    .ofooter{display:flex;justify-content:space-between;align-items:center;}
+    .ometa{font-size:11px;color:var(--lt);}
+    .ototl{font-weight:700;font-size:16px;color:var(--dan);}
+
+    .filter-bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+    .fbtn{padding:6px 12px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--surf);font-size:12px;font-weight:600;cursor:pointer;color:var(--muted);transition:.15s;}
+    .fbtn:hover{border-color:var(--pri);color:var(--pri);}
+    .fbtn.act{background:var(--fin);color:#fff;border-color:var(--fin);}
+    .date-inp{padding:6px 10px;border:1.5px solid var(--bdr);border-radius:8px;font-size:12px;font-weight:600;color:var(--pri);outline:none;}
+
+    .xl-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;overflow-y:auto;padding:16px;}
+    .xl-modal.show{display:flex;align-items:flex-start;justify-content:center;}
+    .xl-box{background:var(--surf);border-radius:var(--rad-lg);width:100%;max-width:900px;overflow:hidden;margin:auto;}
+    .xl-head{background:var(--fin);color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:14px;}
+    .xl-close{background:rgba(255,255,255,.2);border:none;color:#fff;width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1;}
+    .xl-body{padding:16px;}
+    .xl-foot{padding:12px 16px;border-top:1px solid var(--bdr);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
+
+    .info-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+    .info-box{background:var(--bg);border-radius:8px;padding:10px;}
+    .info-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;font-weight:700;}
+    .info-val{font-weight:700;font-size:13px;}
+    .cust-box{background:var(--fin-lt);border-radius:8px;padding:10px;margin-bottom:14px;}
+    .cust-name{font-weight:700;color:var(--fin);font-size:14px;}
+    .cust-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+    
+
+    /* ================= FIX LỆCH CỘT XỬ LÝ ĐƠN ================= */
+    .items-head, .ig {
+      display: flex !important;
+      gap: 6px !important;
+      align-items: center !important;
+      width: 100% !important;
+      padding-right: 0 !important;
+    }
+    
+    /* Ép tất cả thẻ con không được tràn viền */
+    .items-head > *, .ig > * {
+      flex: none !important;
+      min-width: 0 !important;
+      box-sizing: border-box !important;
+    }
+    
+    /* Cột 1: Sản phẩm (Ép tự thu gọn chữ nếu quá dài) */
+    .items-head > :nth-child(1), .ig > :nth-child(1) { flex: 1.7 !important; text-align: left !important; }
+    .ig > :nth-child(1) { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+    
+    /* Cột 2: Số lượng */
+    .items-head > :nth-child(2), .ig > :nth-child(2) { flex: 0 0 50px !important; text-align: center !important; }
+    
+    /* Cột 3: Đơn giá */
+    .items-head > :nth-child(3), .ig > :nth-child(3) { flex: 0 0 80px !important; text-align: right !important; }
+    
+    /* Cột 4: CK% */
+    .items-head > :nth-child(4), .ig > :nth-child(4) { flex: 0 0 45px !important; text-align: center !important; }
+    
+    /* Cột 5: Giá sau CK */
+    .items-head > :nth-child(5), .ig > :nth-child(5) { flex: 0 0 80px !important; text-align: right !important; }
+    
+    /* Cột 6: Tổng tiền */
+    .items-head > :nth-child(6), .ig > :nth-child(6) { flex: 0 0 90px !important; text-align: right !important; display: block !important; }
+    
+    /* Cột 7: Ghi chú */
+    .items-head > :nth-child(7), .ig > :nth-child(7) { flex: 0.6 !important; text-align: left !important; }
+    
+    /* Cột 8: Nút Xóa (hoặc khoảng trống) */
+    .items-head > :nth-child(8), .ig > :nth-child(8) { flex: 0 0 24px !important; }
+    /* Ép toàn bộ Tiêu đề cột in đậm và canh GIỮA tuyệt đối */
+    .items-head > span:nth-child(n) {
+      display: flex !important;
+      justify-content: center !important; /* Ép vào giữa theo chiều ngang */
+      align-items: center !important; /* Ép vào giữa theo chiều dọc */
+      text-align: center !important;
+      font-weight: 800 !important; 
+      text-transform: uppercase !important; 
+      color: var(--pri) !important; 
+    }
+
+    /* Cân chỉnh lại input cho đẹp */
+    .ig > input { padding: 4px 6px !important; }
+    /* ========================================================== */
+    .item-row-xl{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rad);padding:8px;margin-bottom:6px;border-left:3px solid var(--fin);}
+    .ig{display:grid;grid-template-columns:2fr 55px 85px 60px 85px 80px 24px;gap:5px;align-items:center;}
+    .iname{font-weight:600;font-size:12px;}
+    .xi{width:100%;padding:5px 6px;border:1.5px solid var(--bdr);border-radius:6px;font-size:12px;font-weight:700;text-align:center;outline:none;color:var(--txt);background:var(--surf);transition:.15s;}
+    .xi:focus{border-color:var(--fin);}
+    .xi.xq{color:var(--pri);}
+    .xi.xp{color:var(--dan);}
+    .xi.xck{color:var(--warn);}
+    .xi.xtt{color:var(--fin);background:var(--fin-lt);border-color:transparent;font-weight:700;}
+    .xi.xn{text-align:left;font-weight:400;font-size:11px;}
+    .irm{width:22px;height:22px;border-radius:50%;background:var(--dan-lt);border:none;color:var(--dan);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:.15s;flex-shrink:0;}
+    .irm:hover{background:var(--dan);color:#fff;}
+
+    .global-ck-box{background:var(--warn-lt);border:2px solid var(--warn);border-radius:var(--rad);padding:12px 14px;margin:12px 0;display:flex;align-items:center;gap:12px;}
+    .global-ck-label{font-size:12px;font-weight:700;color:var(--warn);white-space:nowrap;}
+    .global-ck-inp{width:80px;padding:7px 10px;border:2px solid var(--warn);border-radius:8px;font-size:15px;font-weight:700;text-align:center;color:var(--warn);outline:none;background:#fff;}
+    .global-ck-inp:focus{box-shadow:0 0 0 3px rgba(217,119,6,.2);}
+    .global-ck-pct{font-size:14px;font-weight:700;color:var(--warn);}
+    .global-ck-info{flex:1;font-size:12px;color:var(--muted);}
+
+    .grand{background:var(--fin-lt);border:2px solid var(--fin);border-radius:var(--rad-lg);padding:14px;margin-top:10px;}
+    .gr{display:flex;justify-content:space-between;align-items:center;}
+    .glbl{font-weight:600;color:var(--muted);font-size:13px;}
+    .gamt{font-size:26px;font-weight:700;color:var(--fin);}
+    .gsub{font-size:12px;color:var(--muted);margin-top:5px;}
+
+    .note-area{margin-top:12px;}
+    .note-lbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;}
+    .note-ta{width:100%;padding:8px 10px;border:1.5px solid var(--bdr);border-radius:8px;font-size:13px;outline:none;color:var(--txt);resize:none;}
+    .note-ta:focus{border-color:var(--fin);}
+
+    .sh-date-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--bg);border-radius:var(--rad);padding:10px 12px;margin-bottom:12px;}
+    .sh-date-bar label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;}
+    .sdbtn{padding:5px 10px;border-radius:6px;border:1.5px solid var(--bdr);background:var(--surf);font-size:11px;font-weight:700;cursor:pointer;color:var(--muted);transition:.15s;white-space:nowrap;}
+    .sdbtn:hover{border-color:var(--pri);color:var(--pri);}
+    .sdbtn.act{background:var(--pri);color:#fff;border-color:var(--pri);}
+    .sh-custom{display:flex;gap:6px;align-items:center;width:100%;margin-top:6px;}
+
+    .res-card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rad);padding:10px 12px;margin-bottom:8px;border-left:4px solid var(--info);}
+    .res-card.cust-rc{border-left-color:var(--suc);cursor:pointer;transition:.15s;}
+    .res-card.cust-rc:hover{box-shadow:0 2px 8px rgba(14,159,110,.1);}
+    .res-sum{background:var(--pri-lt);border-radius:var(--rad);padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;}
+
+    .dtbl{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;}
+    .dtbl th{background:var(--bg);padding:7px 6px;text-align:left;font-weight:700;color:var(--muted);border-bottom:1.5px solid var(--bdr);font-size:10px;text-transform:uppercase;letter-spacing:.4px;overflow:hidden;}
+    .dtbl td{padding:7px 6px;border-bottom:1px solid var(--bdr);vertical-align:middle;overflow-wrap:break-word;word-break:break-word;font-size:11px;}
+    .dtbl tr:last-child td{border-bottom:none;}
+
+    .admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+    .atile{border-radius:var(--rad);padding:16px;text-align:center;cursor:pointer;transition:.15s;}
+    .atile:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.1);}
+    .atile-icon{font-size:26px;margin-bottom:6px;}
+    .atile-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+
+    .pag{display:flex;justify-content:space-between;align-items:center;margin-top:12px;}
+
+    /* =========================================================
+       TRANG ĐĂNG NHẬP (LOGIN)
+       ========================================================= */
+    .login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 20px; }
+    .login-card { background: rgba(255,255,255,0.95); backdrop-filter: blur(15px); border-radius: 30px; padding: 45px 36px; width: 100%; max-width: 400px; box-shadow: 0 30px 60px -12px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.3); }
+    .login-logo { background: transparent; box-shadow: none; width: 160px; height: auto; margin: 0 auto 24px; display: flex; justify-content: center; }
+    .login-logo img { width: 100%; height: auto; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); }
+    .pass-wrap { position: relative; }
+    .pass-toggle { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--lt); font-size: 18px; transition: 0.25s; }
+    .pass-toggle:hover { color: var(--pri); }
+
+    #mapFrameContainer{width:100%;height:420px;border-radius:var(--rad-lg);overflow:hidden;background:var(--bg);border:1px solid var(--bdr);display:flex;align-items:center;justify-content:center;}
+
+    .imp-item{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rad);padding:9px 12px;margin-bottom:7px;border-left:4px solid var(--info);display:flex;align-items:center;gap:8px;}
+
+    ::-webkit-scrollbar{width:4px;height:4px;}::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:4px;}
+
+    .empty{text-align:center;padding:50px 20px;color:var(--muted);}
+    .empty-icon{font-size:40px;margin-bottom:12px;}
+    .empty-title{font-weight:600;font-size:14px;margin-bottom:6px;}
+    .empty-sub{font-size:12px;}
+
+    @media print {
+      body * { visibility: hidden; }
+      .print-area, .print-area * { visibility: visible; }
+      .print-area { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+    /* CHỈ BÁO SỐ LƯỢNG MÀU ĐỎ TRÊN TOP MENU */
+    .top-badge {
+  background: #e02424; /* Màu đỏ --dan */
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 5px;
+  vertical-align: middle;
+  display: inline-block;
+  line-height: 1.4;
+}
+/* =========================================================
+       TỰ ĐỘNG CHUYỂN ĐỔI MENU NGANG/DỌC THEO THIẾT BỊ
+       ========================================================= */
+    @media (max-width: 768px) {
+      /* Trên Điện thoại & Tablet: Ẩn menu ngang, Hiện nút Menu dọc */
+      #adminTopMenu {
+        display: none !important;
+      }
+      #hamburgerBtn {
+        display: flex !important;
+      }
+    }
+    /* --- NGĂN TRÌNH DUYỆT ĐIỆN THOẠI TỰ ĐỘNG PHÓNG TO KHI NHẬP LIỆU --- */
+@media screen and (max-width: 768px) {
+  input, select, textarea,
+  .ci-inp, .xi, .date-inp, .global-ck-inp, .fselect {
+    font-size: 16px !important;
+  }
+}
+// ================================================================
+// CSS – CHỈ CẦN THÊM PHẦN NÀY VÀO TRƯỚC </style> TRONG Index.html
+// (Rất ít vì phần lớn đã dùng inline style rồi)
+// ================================================================
+/*
+ 
+.ms-qty {
+  width: 46px;
+  padding: 5px 4px;
+  border: 2px solid #1a56db;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+  color: #1a56db;
+  background: #fff;
+  outline: none;
+  transition: width .18s ease, box-shadow .15s;
+  -moz-appearance: textfield;
+}
+.ms-qty::-webkit-inner-spin-button,
+.ms-qty::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.ms-qty:focus { width: 68px; box-shadow: 0 0 0 3px rgba(26,86,219,.18); }
+ 
+*/
+/* 1. Ẩn mũi tên lên xuống của ô input number */
+#xlSearchIdInp::-webkit-outer-spin-button,
+#xlSearchIdInp::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+#xlSearchIdInp[type=number] {
+  -moz-appearance: textfield; /* Cho Firefox */
+}
+
+/* 2. Thiết kế nút OK 3D nổi khối màu xanh lá */
+.btn-ok-3d {
+  background-color: #28a745; /* Màu xanh lá chuẩn */
+  color: #fff;
+  font-family: sans-serif;
+  font-size: 16px;
+  font-weight: bold;
+  text-transform: uppercase;
+  padding: 10px 25px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  
+  /* Tạo lớp đế 3D dày bên dưới */
+  box-shadow: 0 5px 0 #1e7e34, 0 8px 15px rgba(0, 0, 0, 0.2);
+  
+  transition: all 0.1s ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
+}
+
+/* Hiệu ứng khi nhấn xuống (nút lún xuống thật sự) */
+.btn-ok-3d:active {
+  box-shadow: 0 1px 0 #1e7e34;
+  transform: translateY(4px); /* Nhấn xuống 4px che mất phần đế */
+}
+
+.btn-ok-3d:hover {
+  background-color: #218838;
+}
+
+/* Ô nhập mã HĐ đồng bộ */
+.inp-mhd-clean {
+  flex: 1;
+  height: 42px;
+  border: 2px solid #ced4da;
+  border-radius: 8px;
+  padding: 0 15px;
+  font-size: 16px;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.inp-mhd-clean:focus {
+  border-color: #28a745;
+}
+/* Thêm style cho trạng thái Đã Hủy */
+  .stt-huy {
+    background-color: #8b0000 !important; /* Đỏ đậm */
+    color: #ffff00 !important;           /* Vàng đậm */
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    font-size: 11px;
+  }
+/* ===== FIX Ô SỐ LƯỢNG VÀ CHIẾT KHẤU TRONG MODAL XỬ LÝ ĐƠN ===== */
+/* 1. Ẩn mũi tên tăng/giảm (spinner) của SL và CK */
+.xi.xq::-webkit-outer-spin-button,
+.xi.xq::-webkit-inner-spin-button,
+#xlModalBody input[type=number]::-webkit-outer-spin-button,
+#xlModalBody input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+.xi.xq[type=number],
+#xlModalBody input[type=number] {
+  -moz-appearance: textfield !important;
+}
+
+/* 2. Mở rộng ô SL và CK đủ hiển thị 4-5 chữ số */
+.xi.xq,
+#xlModalBody input[type=number] {
+  min-width: 62px !important;
+  width: 62px !important;
+  padding: 5px 4px !important;
+  text-align: center !important;
+}
+
+/* 3. Đồng thời fix cột SL trong .ig cho vừa khung (như bạn đã cấu hình) */
+.ig > :nth-child(2) {
+  flex: 0 0 62px !important;
+  min-width: 62px !important;
+}
+/* 4. Mở rộng riêng ô Chiết khấu tổng và Khách thanh toán trước (Nhập được 9-10 chữ số) */
+#xlModalBody input.global-ck-inp,
+#xlModalBody input.global-ck-inp[type=number] {
+  min-width: 160px !important;
+  width: 160px !important;
+  padding: 3px 8px !important;
+  text-align: right !important;
+}
+/* --- ÉP MỞ RỘNG FULL MÀN HÌNH --- */
+  #invoiceSettingsModal .xl-box { 
+    max-width: 100vw !important; 
+    width: 100vw !important; 
+    height: 100vh !important; 
+    max-height: 100vh !important;
+    border-radius: 0 !important; 
+    margin: 0 !important;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* Cấu trúc chia 2 cột */
+  .is-container { 
+    display: flex; 
+    flex-direction: row; 
+    flex: 1; /* Chiếm trọn không gian giữa Header và Footer */
+    min-height: 0; /* Quan trọng: bắt buộc phải có để thanh cuộn hoạt động */
+    overflow: hidden; 
+  }
+  
+  /* CỘT TRÁI (Form Cài Đặt): Cuộn dọc độc lập */
+  .is-left { 
+    width: 450px; 
+    flex: none; 
+    overflow-y: auto; /* Tự tạo thanh cuộn dọc */
+    padding: 20px; 
+    border-right: 1px solid #e5e7eb; 
+    background: #fff;
+  }
+  
+  /* Làm đẹp thanh cuộn cột trái */
+  .is-left::-webkit-scrollbar { width: 6px; }
+  .is-left::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+  .is-left::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  
+  /* CỘT PHẢI (Preview): Cố định, nhường cho iframe tự cuộn */
+  .is-right { 
+    flex: 1; 
+    background: #525659; 
+    display: flex; 
+    flex-direction: column; 
+    padding: 20px; 
+    overflow: hidden;
+  }
+  
+  /* RESPONSIVE: Điện thoại xếp dọc */
+  @media (max-width: 768px) {
+    .is-container { flex-direction: column; }
+    .is-left { width: 100%; flex: 1; }
+    .is-right { height: 50vh; flex: none; border-top: 2px solid #333; }
+  }
+  #orderDetailModal .modal-body {
+  overflow-x: hidden; /* tránh double scrollbar */
+  padding: 12px;
+}
+
+#orderDetailModal .table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  display: block;
+}
+/* ===== NÚT ẨN/HIỆN TẤT CẢ DỮ LIỆU LỊCH SỬ (mặc định chỉ 300 dòng cuối) ===== */
+.hist-all-btn{display:inline-flex;align-items:center;gap:5px;margin-left:6px;}
+.hist-all-btn.on{background:var(--warn);color:#fff;border-color:var(--warn);}
+.hist-all-btn.on:hover{color:#fff;}
+.hist-all-btn:disabled{opacity:.6;cursor:wait;}
+  </style>
 </head>
 <body>
-  <div id="login-screen" class="login-wrap">
+<!-- LOGIN -->
+<div id="loginBox">
+  <div class="login-wrap">
     <div class="login-card">
-      <h1>QUẢN LÝ ÁNH DƯƠNG</h1>
-      <p class="muted">Công Ty TNHH Thiết Bị Kim Khí Ánh Dương</p>
-      <form id="login-form">
-        <label>Tên đăng nhập</label>
-        <input id="login-user" type="text" placeholder="Nhập tài khoản..." required />
-        <label>Mật khẩu</label>
-        <input id="login-pass" type="password" placeholder="Nhập mật khẩu..." required />
-        <label class="checkbox-row">
-          <input id="login-remember" type="checkbox" checked />
-          <span>Duy trì đăng nhập (7 ngày)</span>
-        </label>
-        <button id="login-btn" type="submit" class="btn btn-primary full-w">Đăng Nhập Hệ Thống</button>
-      </form>
+      <div class="login-logo">
+        <img src="https://i.postimg.cc/mZ0B69QB/logo-AD.png" alt="Ánh Dương Logo">
+      </div>
+      <div style="text-align:center;font-size:24px;font-weight:900;color:var(--txt);margin-bottom:8px">Công Ty Ánh Dương</div>
+      <div style="text-align:center;font-size:14px;color:var(--muted);font-weight:600;margin-bottom:35px">Hệ thống quản lý nội bộ</div>
+      <div style="margin-bottom:18px">
+        <label style="font-size:11.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px">Tài khoản</label>
+        <input type="text" id="u" class="finput" placeholder="Nhập ID nhân viên...">
+      </div>
+      <div style="margin-bottom:20px">
+        <label style="font-size:11.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px">Mật khẩu</label>
+        <div class="pass-wrap">
+          <input type="password" id="p" class="finput" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()">
+          <span class="pass-toggle" onclick="togglePass()"><i id="passEye" class="fas fa-eye"></i></span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:28px">
+        <input type="checkbox" id="remMe" class="form-check-input mt-0" style="cursor:pointer; width:18px; height:18px;">
+        <label for="remMe" style="font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;user-select:none">Duy trì đăng nhập</label>
+      </div>
+      <button class="btn2 btn-pri btn-full" id="loginBtn" onclick="login()" style="padding:14px; font-size:15px;">
+        <i class="fas fa-sign-in-alt"></i> ĐĂNG NHẬP
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="mainApp" style="display:none;">
+
+  <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+  <!-- TOP NAV CHÍNH -->
+  <div class="top-nav">
+    <button class="hamburger" id="hamburgerBtn" onclick="toggleSidebar()" style="position: relative;">
+  <i class="fas fa-bars"></i>
+  <span id="hamburgerDraftBadge" class="top-badge" style="display:none; position:absolute; top:-4px; right:-4px; padding:2px 5px; font-size:9px; border:2px solid var(--pri);">0</span>
+</button>
+    
+    <div class="brand">
+      <div class="brand-text">
+        <span class="brand-name">Ánh Dương</span>
+        <span class="brand-user" id="userDisplay">Chưa đăng nhập</span>
+      </div>
+    </div>
+
+    <!-- MENU ADMIN NẰM NGANG -->
+    <div id="adminTopMenu" class="admin-nav-menu">
+      <div class="admin-dropdown">
+        <button class="admin-menu-btn" onclick="toggleAdminDropdown(this)">
+          📦 Đặt Hàng 
+          <!-- BỘ ĐẾM SỐ LƯỢNG ĐƠN TẠM -->
+          <span id="topDatHangCount" class="top-badge" style="display:none">0</span>
+          <i class="fas fa-chevron-down ms-1"></i>
+        </button>
+        <div class="admin-dropdown-content">
+          <a onclick="showPage('order');closeAllAdminDropdowns()">Đặt Hàng Mới</a>
+          <a onclick="showPage('drafts');closeAllAdminDropdowns()" style="display:flex; justify-content:space-between;">Đơn Lưu Tạm <span id="topMenuDraftBadge" class="sb-badge" style="display:none">0</span></a>
+          <a onclick="showPage('history');closeAllAdminDropdowns()">Quản Lý Đơn Hàng</a>
+          <a onclick="showPage('lichSuHoaDon');closeAllAdminDropdowns()">Lịch Sử Hóa Đơn</a>
+          <a onclick="showPage('lichSuCongNo');closeAllAdminDropdowns()">Lịch Sử Công Nợ</a>
+          <a onclick="showPage('searchCompleted');closeAllAdminDropdowns()">Tra cứu Xuất hàng</a>
+         </div>
+      </div>
+
+      <div class="admin-dropdown">
+        <button class="admin-menu-btn" onclick="toggleAdminDropdown(this)">
+          ⚙️ Xử Lý 
+          <span id="topXuLyCount" class="top-badge" style="display:none">0</span>
+          <i class="fas fa-chevron-down ms-1"></i>
+        </button>
+        <div class="admin-dropdown-content">
+          <a onclick="showPage('xulydh');closeAllAdminDropdowns()" style="display:flex; justify-content:space-between;">
+            Xử Lý Đơn Hàng 
+            <span id="topMenuXuLyCount" class="sb-badge" style="display:none">0</span>
+          </a>
+          <a onclick="showPage('thanhToan');closeAllAdminDropdowns()">Thanh Toán</a>
+          <a onclick="showPage('lichSuThanhToan');closeAllAdminDropdowns()">Lịch Sử Thanh Toán</a>
+        </div>
+      </div>
+
+      <div class="admin-dropdown">
+        <button class="admin-menu-btn" onclick="toggleAdminDropdown(this)">
+          🏭 Nhập Kho 
+          <i class="fas fa-chevron-down ms-1"></i>
+        </button>
+        <div class="admin-dropdown-content">
+          <a onclick="showPage('import');closeAllAdminDropdowns()">📥 Nhập Kho Hàng Hóa</a>
+          <a onclick="showPage('importHistory');closeAllAdminDropdowns()">📊 Lịch Sử Nhập Kho</a>
+          <a onclick="showPage('searchImport');closeAllAdminDropdowns()">🔍 Tra Cứu Nhập Kho</a>
+        </div>
+      </div>
+
+      <div class="admin-dropdown">
+        <button class="admin-menu-btn" onclick="toggleAdminDropdown(this)">🔍 Tra Cứu & Tiện Ích <i class="fas fa-chevron-down ms-1"></i></button>
+        <div class="admin-dropdown-content">
+          <a onclick="showReport('revenue'); closeAllAdminDropdowns()">📊 Báo Cáo Thống Kê</a>
+          <a onclick="showPage('searchHistory');closeAllAdminDropdowns()">Lịch Sử Bán Hàng</a>
+          <a onclick="showPage('addCust');closeAllAdminDropdowns()">Thêm Khách Hàng Mới</a>
+          <a onclick="showPage('products');closeAllAdminDropdowns()">Sản Phẩm</a>
+          <a onclick="showPage('customers');closeAllAdminDropdowns()">Khách Hàng</a>
+        </div>
+      </div>
+
+      <div class="admin-dropdown">
+        <button class="admin-menu-btn" onclick="toggleAdminDropdown(this)">🛠️ Quản Lý <i class="fas fa-chevron-down ms-1"></i></button>
+        <div class="admin-dropdown-content">
+          <a onclick="showPage('customers');closeAllAdminDropdowns()">Khách Hàng</a>
+          <a onclick="showPage('products');closeAllAdminDropdowns()">Sản Phẩm</a>
+          <a id="topTimKiemBH" style="display:none" onclick="showPage('timKiemBH');closeAllAdminDropdowns()">Tìm Kiếm</a>
+          <a onclick="showPage('admin');closeAllAdminDropdowns()">Admin Panel</a>
+        </div>
+      </div>
+      <div class="admin-dropdown">
+        <button class="admin-menu-btn" onclick="toggleAdminDropdown(this)">🛡️ Bảo Hành <i class="fas fa-chevron-down ms-1"></i></button>
+        <div class="admin-dropdown-content">
+          <a onclick="showPage('baoHanh');closeAllAdminDropdowns()">Nhập BH Không Bán </a>
+          <a onclick="showPage('lsBHKBD');closeAllAdminDropdowns()">Lịch Sử BH Không Bán Được</a>
+          <a onclick="showPage('baoHanhBD');closeAllAdminDropdowns()">Nhập BH Bán Được</a>
+          <a onclick="showPage('lsBHBD');closeAllAdminDropdowns()">Lịch Sử BH Bán Được</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Các nút bên phải -->
+    <div style="margin-left: auto; display: flex; gap: 8px;">
+      <button class="nav-btn" onclick="refreshCurrentData(this)"><i class="fas fa-sync-alt"></i> Làm mới</button>
+      <button class="nav-btn red" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button>
     </div>
   </div>
 
-  <div id="app-screen" class="hidden">
-    <header class="topbar">
-      <div class="topbar-left">
-        <button id="btn-sidebar" type="button" class="icon-btn">☰</button>
-        <span class="brand" id="brand-home">ÁNH DƯƠNG</span>
-        <span id="role-badge" class="role-pill"></span>
-      </div>
-      <nav id="desktop-nav" class="desktop-nav"></nav>
-      <div class="topbar-right">
-        <button id="btn-sync" type="button" class="icon-btn" title="Đồng bộ">↻</button>
-        <span id="user-name" class="user-label"></span>
-        <button id="btn-logout" type="button" class="icon-btn danger" title="Đăng xuất">⎋</button>
-      </div>
-    </header>
+  <!-- SIDEBAR (Chỉ hiển thị cho Sale & Leader) -->
+  <div class="sidebar" id="sidebar">
+    <div class="sb-head" style="position: relative;">
+      <div class="sb-logo">☀️</div>
+      <div class="sb-title">Ánh Dương</div>
+      <div class="sb-sub" id="sbUserInfo">Hệ thống quản lý</div>
 
-    <div id="sidebar-backdrop" class="sidebar-backdrop hidden"></div>
-    <aside id="mobile-sidebar" class="sidebar hidden"></aside>
+      <button id="btnToggleApkNotif" onclick="toggleApkNotif()" style="position:absolute; right:16px; top:50%; transform:translateY(-50%); background:#10b981; border:1.5px solid #a7f3d0; color:#fff; border-radius:20px; padding:6px 12px; font-size:12px; font-weight:700; display:flex; align-items:center; gap:5px; cursor:pointer; outline:none; box-shadow:0 2px 6px rgba(0,0,0,0.2);">
+        <span id="iconApkNotif">🔔</span>
+        <span id="txtApkNotif">ON</span>
+      </button>
+    </div>
 
-    <main id="main-view" class="container"></main>
+    <div class="sb-grp">
+      <div class="sb-grp-hdr" onclick="toggleSbGrp('datHang')">
+        <div class="sb-grp-label"><span class="sb-grp-dot dot-blue"></span>Đặt hàng <span class="sb-grp-badge" id="sbGrpBadgeDatHang" style="display:none">0</span></div>
+        <span class="sb-chevron open" id="sbChev-datHang">▼</span>
+      </div>
+      <div class="sb-items open" id="sbItems-datHang">
+        <div class="sb-item active" data-tab="order" onclick="showPage('order');closeSidebar()"><i class="fas fa-shopping-cart"></i> Đặt hàng mới</div>
+        <div class="sb-item" data-tab="drafts" onclick="showPage('drafts');closeSidebar()"><i class="fas fa-folder-open"></i> Đơn Lưu Tạm <span class="sb-badge" id="sbDraftBadge" style="display:none">0</span></div>
+        <div class="sb-item" data-tab="history" onclick="showPage('history');closeSidebar()"><i class="fas fa-file-invoice"></i> Quản Lý Đơn hàng</div>
+        <div class="sb-item" data-tab="lichSuHoaDon" onclick="showPage('lichSuHoaDon');closeSidebar()"><i class="fas fa-receipt"></i> Lịch Sử Hóa Đơn</div>
+        <div class="sb-item" data-tab="lichSuCongNo" onclick="showPage('lichSuCongNo');closeSidebar()"><i class="fas fa-file-invoice-dollar"></i> Lịch Sử Công Nợ</div>
+        <div class="sb-item" data-tab="searchCompleted" onclick="showPage('searchCompleted');closeSidebar()"><i class="fas fa-check-double"></i> Tra cứu Xuất hàng</div>
+      </div>
+    </div>
+
+    <div class="sb-grp" id="sbSectionXuLy" style="display:none">
+      <div class="sb-grp-hdr" onclick="toggleSbGrp('xuLy')">
+        <div class="sb-grp-label"><span class="sb-grp-dot dot-purple"></span>Xử lý <span class="sb-grp-badge" id="sbGrpBadgeXuLy" style="display:none"></span></div>
+        <span class="sb-chevron open" id="sbChev-xuLy">▼</span>
+      </div>
+      <div class="sb-items open" id="sbItems-xuLy">
+        <div class="sb-item xuly-item" data-tab="xulydh" onclick="showPage('xulydh');closeSidebar()"><i class="fas fa-cogs"></i> Xử lý đơn hàng <span class="sb-badge" id="sbXuLyBadge" style="display:none"></span></div>
+        <div class="sb-item xuly-item" data-tab="thanhToan" id="sbThanhToan" onclick="showPage('thanhToan');closeSidebar()"><i class="fas fa-wallet"></i> Thanh Toán</div>
+        <div class="sb-item xuly-item" data-tab="lichSuThanhToan" id="sbLSThanhToan" onclick="showPage('lichSuThanhToan');closeSidebar()"><i class="fas fa-history"></i> Lịch Sử Thanh Toán</div>
+        <div class="sb-item xuly-item" data-tab="import" onclick="showPage('import');closeSidebar()"><i class="fas fa-truck-loading"></i> Nhập kho</div>
+        <div class="sb-item xuly-item" data-tab="importHistory" onclick="showPage('importHistory');closeSidebar()"><i class="fas fa-history"></i> Lịch sử nhập</div>
+        <div class="sb-item xuly-item" data-tab="searchImport" onclick="showPage('searchImport');closeSidebar()"><i class="fas fa-search"></i> Tra Cứu Nhập Kho</div>
+      </div>
+    </div>
+
+    <div class="sb-grp">
+      <div class="sb-grp-hdr" onclick="toggleSbGrp('traCuu')">
+        <div class="sb-grp-label"><span class="sb-grp-dot dot-teal"></span>Tra cứu & Tiện ích</div>
+        <span class="sb-chevron open" id="sbChev-traCuu">▼</span>
+      </div>
+      <div class="sb-items open" id="sbItems-traCuu">
+        <div class="sb-item" id="sbReportMenu" data-tab="report" style="display:none" onclick="showReport('revenue');closeSidebar()"><i class="fas fa-chart-line"></i> Báo Cáo Thống Kê</div>
+        <div class="sb-item" data-tab="searchHistory" onclick="showPage('searchHistory');closeSidebar()"><i class="fas fa-search"></i> Tra cứu bán hàng</div>
+        <div class="sb-item" data-tab="addCust" onclick="showPage('addCust');closeSidebar()"><i class="fas fa-user-plus"></i> Thêm khách hàng</div>
+        <div class="sb-item" data-tab="map" onclick="showPage('map');closeSidebar()"><i class="fas fa-map-marker-alt"></i> Bản đồ</div>
+      </div>
+    </div>
+    <div class="sb-grp" id="sbSectionBaoHanh" style="display:none">
+      <div class="sb-grp-hdr" onclick="toggleSbGrp('baoHanh')">
+        <div class="sb-grp-label"><span class="sb-grp-dot dot-amber"></span>Bảo hành</div>
+        <span class="sb-chevron open" id="sbChev-baoHanh">▼</span>
+      </div>
+      <div class="sb-items open" id="sbItems-baoHanh">
+        <div class="sb-item" data-tab="baoHanh" onclick="showPage('baoHanh');closeSidebar()"><i class="fas fa-shield-alt"></i> Nhập BH Không Bán Được</div>
+        <div class="sb-item" data-tab="lsBHKBD" onclick="showPage('lsBHKBD');closeSidebar()"><i class="fas fa-table"></i> Lịch Sử KKo Bán Được </div>
+        <div class="sb-item" data-tab="baoHanhBD" onclick="showPage('baoHanhBD');closeSidebar()"><i class="fas fa-box-open"></i> Nhập BH Bán Được</div>
+       <div class="sb-item" data-tab="lsBHBD" onclick="showPage('lsBHBD');closeSidebar()"><i class="fas fa-clipboard-list"></i> Lịch Sử BH Bán Được</div>
+      </div>
+    </div>
+
+    <div class="sb-grp" id="sbSectionQuanLy" style="display:none">
+      <div class="sb-grp-hdr" onclick="toggleSbGrp('quanLy')">
+        <div class="sb-grp-label"><span class="sb-grp-dot dot-amber"></span>Quản lý</div>
+        <span class="sb-chevron open" id="sbChev-quanLy">▼</span>
+      </div>
+      <div class="sb-items open" id="sbItems-quanLy">
+        <div class="sb-item" data-tab="customers" onclick="showPage('customers');closeSidebar()"><i class="fas fa-users"></i> Khách hàng</div>
+        <div class="sb-item" data-tab="products" onclick="showPage('products');closeSidebar()"><i class="fas fa-box"></i> Sản phẩm</div>
+        <div class="sb-item" data-tab="admin" id="sbAdmin" style="display:none" onclick="showPage('admin');closeSidebar()"><i class="fas fa-cog"></i> Admin</div>
+      </div>
+    </div>
+     
+    <div class="sb-grp" id="sbSectionBaoHanh" style="display:none">
+      <div class="sb-grp-hdr" onclick="toggleSbGrp('baoHanh')">
+        <div class="sb-grp-label"><span class="sb-grp-dot dot-warn"></span>Bảo hành</div>
+        <span class="sb-chevron open" id="sbChev-baoHanh">▼</span>
+      </div>
+      <div class="sb-items open" id="sbItems-baoHanh">
+        <div class="sb-item" data-tab="baoHanh" onclick="showPage('baoHanh');closeSidebar()"><i class="fas fa-shield-alt"></i> Nhập BH Không Bán</div>
+        <div class="sb-item" data-tab="lsBHKBD" onclick="showPage('lsBHKBD');closeSidebar()"><i class="fas fa-table"></i> Lịch Sử Không Bán</div>
+        <div class="sb-item" data-tab="baoHanhBD" onclick="showPage('baoHanhBD');closeSidebar()"><i class="fas fa-box-open"></i> Nhập BH Bán Được</div>
+        <div class="sb-item" data-tab="lsBHBD" onclick="showPage('lsBHBD');closeSidebar()"><i class="fas fa-clipboard-list"></i> Lịch Sử Bán Được</div>
+      </div>
+    </div>
+    <div class="sb-close">
+      <button class="btn2 btn-out btn-full" onclick="closeSidebar()"><i class="fas fa-times"></i> Đóng menu</button>
+    </div>
   </div>
 
-  <div id="modal-backdrop" class="modal-backdrop hidden">
-    <div id="modal-box" class="modal-box"></div>
+  <div class="main-wrap">
+    <div class="container-fluid" style="max-width:95%;padding:0">
+      <!-- NÚT QUAY LẠI TOÀN CỤC (THÊM MỚI) -->
+      <div id="globalBackBtn" style="display:none; padding: 12px 14px 0 14px;">
+        <button onclick="goBack()" style="background:var(--surf); border:1px solid var(--bdr); color:var(--muted); font-size:12px; font-weight:700; padding:6px 14px; border-radius:20px; box-shadow: 0 2px 4px rgba(0,0,0,0.04); cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:0.2s;">
+          <i class="fas fa-arrow-left"></i> Quay lại
+        </button>
+      </div>
+      <!-- KẾT THÚC NÚT QUAY LẠI -->
+      <!-- ========== ĐẶT HÀNG ========== -->
+      <div id="pOrder" class="page active">
+        <div class="card">
+          <div class="sec-head"><i class="fas fa-user me-2"></i>Thông tin khách hàng</div>
+          <div id="adminSaleSelectWrap" style="display:none;margin-bottom:8px;gap:8px;align-items:center">
+            <select id="adminSaleSelect" class="finput" style="flex:0 0 55%;max-width:220px" onchange="onAdminSaleChange()">
+              <option value="">-- Chọn Nhân Viên... --</option>
+            </select>
+            <div id="adminSalePhone" style="font-size:13px;font-weight:700;color:var(--dan);white-space:nowrap"></div>
+          </div>
+          <div style="margin-bottom:8px">
+  <input type="text" id="custInp" class="finput" placeholder="🔍 Tìm hoặc chọn khách hàng..." onchange="onCustChange()" oninput="onCustChange()" autocomplete="off">
+  <div id="custSuggestions"></div>
+</div>
+          <div id="addrDisplay" style="display:none" class="addr-box"></div>
+          <div style="margin-bottom:4px">
+            <input type="text" id="searchP" class="finput" placeholder="🔍 Nhập tên sản phẩm để thêm vào đơn..." oninput="search()">
+          </div>
+          <div id="resP"></div>
+
+
+          <!-- BANNER KHÓA KHÁCH HÀNG KHI ĐANG MỞ ĐƠN TẠM -->
+          <div id="draftActiveBanner" style="display:none; background:var(--warn-lt); border:1px solid var(--warn); border-radius:8px; padding:12px; margin-bottom:12px; justify-content:space-between; align-items:center; box-shadow: 0 4px 6px -1px rgba(217, 119, 6, 0.1);">
+             <div>
+               <div style="font-size:11px; color:var(--warn); font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">
+                 <i class="fas fa-edit"></i> Đang xử lý đơn lưu tạm
+               </div>
+               <div id="draftActiveCust" style="color:var(--pri); font-weight:700; margin-top:4px; font-size:14px;"></div>
+               <div style="font-size:11px; color:var(--muted); margin-top:4px;">
+                 Mã HĐ: <span style="background:#fff; padding:2px 6px; border-radius:4px; border:1px dashed var(--warn); color:var(--warn); font-weight:700; font-style:italic;">Sẽ cấp tự động khi Xác nhận</span>
+               </div>
+             </div>
+             <button class="btn2 btn-dng btn-sm2" style="white-space:nowrap; padding:6px 12px; font-weight:700;" onclick="cancelDraft()">
+               <i class="fas fa-trash-alt me-1"></i> Hủy đơn này
+             </button>
+          </div>
+        </div>
+        <div id="cartHeader" class="ci-head" style="display:none">
+          <span style="text-align:center">SL</span><span>Đơn giá</span><span style="text-align:center">CK%</span><span>Ghi chú</span><span style="text-align:right">T.Tiền</span>
+        </div>
+        <div id="cartList"></div>
+        <div class="total-bar" id="totalBar" style="display:none">
+          <div class="total-row" style="margin-top:-5px;margin-bottom:10px;border-bottom:1px dashed var(--bdr);padding-bottom:10px">
+            <span style="font-size:12px;color:var(--muted)">CÔNG NỢ CŨ</span>
+            <span style="font-size:15px;font-weight:700;color:var(--warn)" id="debtH">0đ</span>
+          </div>
+          <div class="total-row">
+            <span style="font-weight:600;color:var(--muted)">TỔNG TOA HÀNG</span>
+            <span class="total-amt" id="totalH">0đ</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button id="btnSaveDraft" class="btn2 btn-out" style="display:none; width:30%; border-color:var(--info); color:var(--info); font-weight:700;" onclick="saveDraft()">Lưu Tạm</button>
+            <button id="btnCancelEdit" class="btn2 btn-out" style="display:none; width:30%" onclick="cancelEdit()">Hủy sửa</button>
+            <button id="btnSubmitOrder" class="btn2 btn-suc btn-full" onclick="submitOrder()">✔ XÁC NHẬN LƯU ĐƠN</button>
+          </div>
+        </div>
+      </div>
+      <!-- ========== ĐƠN LƯU TẠM ========== -->
+      <div id="pDrafts" class="page">
+        <div class="card" style="border-top: 3px solid var(--info);">
+          <div class="sec-head" style="color:var(--info);"><i class="fas fa-folder-open me-2"></i>Danh sách đơn lưu tạm của bạn</div>
+          <div id="draftsPageList"></div>
+        </div>
+      </div>
+
+      <!-- ========== QUẢN LÝ ĐƠN HÀNG ========== -->
+      <div id="pHistory" class="page">
+        <div class="stat-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+          <div class="stat-card">
+            <div class="slabel">Doanh thu</div>
+            <div class="sval" style="color:var(--pri);font-size:15px" id="statOrderTotal">0đ</div>
+            <div class="ssub" id="statTitle">Hôm nay</div>
+          </div>
+          <div class="stat-card" id="cardFilterAll" onclick="setHistFilterStatus('all')" style="cursor:pointer; opacity:1; border-bottom:3px solid var(--dan); transition:0.2s;">
+            <div class="slabel">Tổng đơn</div>
+            <div class="sval" style="color:var(--dan)" id="statOrderCount">0</div>
+            <div class="ssub">phiếu</div>
+          </div>
+          <div class="stat-card" id="cardFilterWait" onclick="setHistFilterStatus('wait')" style="cursor:pointer; opacity:0.5; transition:0.2s;">
+            <div class="slabel">Chờ in</div>
+            <div class="sval" style="color:var(--warn)" id="statWaitCount">0</div>
+            <div class="ssub">phiếu</div>
+          </div>
+          <div class="stat-card" id="cardFilterDone" onclick="setHistFilterStatus('done')" style="cursor:pointer; opacity:0.5; transition:0.2s;">
+            <div class="slabel">Đã in</div>
+            <div class="sval" style="color:var(--suc)" id="statDoneCount">0</div>
+            <div class="ssub">phiếu</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:16px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--bdr)">
+          <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;cursor:pointer">
+            <input type="radio" name="histViewMode" value="all" checked onchange="histPersonalOnly=false;renderHistoryUI()">
+            <span style="color:var(--pri)"><i class="fas fa-globe me-1"></i>Tất cả đơn</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;cursor:pointer">
+            <input type="radio" name="histViewMode" value="personal" onchange="histPersonalOnly=true;renderHistoryUI()">
+            <span style="color:var(--suc)"><i class="fas fa-user me-1"></i>Đơn cá nhân</span>
+          </label>
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <div style="position: relative; display: flex; align-items: center; border: 1px solid var(--bdr, #ccc); border-radius: 6px; background: #fff; padding: 0 10px;">
+            <span style="font-size: 14px; color: #555;">🔍</span>
+            <input type="text" id="historySearchInput" placeholder="Tìm nhanh tên khách hàng..." onkeyup="renderHistoryUI()" style="width: 100%; border: none; outline: none; padding: 8px 10px; font-size: 13px; background: transparent;">
+          </div>
+        </div>
+        <div class="sh-date-bar">
+          <label>Khoảng thời gian:</label>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <button class="sdbtn hist-sdbtn act" onclick="setHistDateMode('today', this)">Hôm nay</button>
+            <button class="sdbtn hist-sdbtn" onclick="setHistDateMode('yesterday', this)">Hôm qua</button>
+            <button class="sdbtn hist-sdbtn" onclick="setHistDateMode('week', this)">7 ngày</button>
+            <button class="sdbtn hist-sdbtn" onclick="setHistDateMode('month', this)">Tháng này</button>
+            <button class="sdbtn hist-sdbtn" onclick="setHistDateMode('all', this)">Tất cả</button>
+            <button class="sdbtn hist-sdbtn" onclick="setHistDateMode('custom', this)">Tùy chọn</button>
+            <button class="sdbtn hist-all-btn" onclick="toggleHistLoadAll()" title="Đang hiển thị 300 dữ liệu gần nhất — bấm để tải tất cả"><i class="fas fa-eye"></i> Hiện tất cả</button>
+          </div>
+          <div class="sh-custom" id="histCustomRange" style="display:none">
+            <label style="white-space:nowrap;font-size:11px;font-weight:700;color:var(--muted)">Từ:</label>
+            <input type="date" id="historyDateFrom" class="finput date-inp" onchange="renderHistoryUI()" style="flex:1;min-width:0;padding:6px 8px;font-size:12px">
+            <label style="white-space:nowrap;font-size:11px;font-weight:700;color:var(--muted)">Đến:</label>
+            <input type="date" id="historyDateTo" class="finput date-inp" onchange="renderHistoryUI()" style="flex:1;min-width:0;padding:6px 8px;font-size:12px">
+          </div>
+        </div>
+        <div id="staffFilterWrap" style="display:none;margin-bottom:8px">
+          <select id="historyStaffFilter" class="finput fselect" onchange="renderHistoryUI()">
+            <option value="ALL">Tất cả nhân viên</option>
+          </select>
+        </div>
+        <div id="histList"></div>
+      </div>
+<div id="pSearchCompleted" class="page" style="display:none;">
+        <div style="text-align:center;margin-bottom:18px;">
+          <h2 style="color:var(--suc);font-weight:800;font-size:22px;letter-spacing:1px;text-transform:uppercase;">
+            ✅ TRA CỨU HÀNG ĐÃ XUẤT (HOÀN THÀNH)
+          </h2>
+        </div>
+
+        <div class="card" style="border-top:3px solid var(--suc); padding: 16px;">
+          <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;display:block">
+            Nhập hoặc chọn tên sản phẩm cần tra cứu
+          </label>
+          <div style="position:relative;">
+            <i class="fas fa-search" style="position:absolute; left:12px; top:19px; transform:translateY(-50%); color:var(--muted); z-index:10;"></i>
+
+            <input type="text" id="inpSearchCompleted" class="finput" autocomplete="off"
+                   style="padding-left:36px;"
+                   placeholder="Nhập tên hoặc mã sản phẩm..." oninput="searchProductForCompleted()">
+
+            <div id="resSearchCompleted" style="position:absolute; width:100%; top:100%; left:0; z-index:100;"></div>
+          </div>
+        </div>
+
+        <!-- ===== THANH LỌC THỜI GIAN + NÚT TẢI EXCEL ===== -->
+        <div class="card" style="padding:12px 16px; margin-top:12px; display:block; text-align:left; direction:ltr;">
+          <div style="display:inline-block;vertical-align:bottom;margin:0 12px 8px 0;text-align:left;">
+            <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;display:block;">Từ ngày</label>
+            <input type="date" id="inpCompletedFrom" class="finput" style="width:150px;" onchange="rerunCompletedSearch()">
+          </div>
+          <div style="display:inline-block;vertical-align:bottom;margin:0 12px 8px 0;text-align:left;">
+            <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;display:block;">Đến ngày</label>
+            <input type="date" id="inpCompletedTo" class="finput" style="width:150px;" onchange="rerunCompletedSearch()">
+          </div>
+          <div style="display:inline-block;vertical-align:bottom;margin:0 12px 8px 0;text-align:left;">
+      <button type="button" class="btn2 btn-out" style="padding:7px 12px;border-radius:6px;font-size:12px;margin:0 6px 6px 0;" onclick="setQuickDateRange('completed','today')">Hôm nay</button>
+      <button type="button" class="btn2 btn-out" style="padding:7px 12px;border-radius:6px;font-size:12px;margin:0 6px 6px 0;" onclick="setQuickDateRange('completed','7d')">7 ngày</button>
+      <button type="button" class="btn2 btn-out" style="padding:7px 12px;border-radius:6px;font-size:12px;margin:0 6px 6px 0;" onclick="setQuickDateRange('completed','month')">Tháng này</button>
+      <button type="button" class="btn2 btn-out" style="padding:7px 12px;border-radius:6px;font-size:12px;margin:0 6px 6px 0;" onclick="setQuickDateRange('completed','lastmonth')">Tháng trước</button>
+      <button type="button" class="btn2 btn-out" style="padding:7px 12px;border-radius:6px;font-size:12px;margin:0 6px 6px 0;" onclick="setQuickDateRange('completed','all')">Tất cả</button>
+          </div>
+          <div style="display:inline-block;vertical-align:bottom;margin:0 0 8px 0;">
+            <button type="button" class="btn2 btn-suc" style="padding:8px 14px;border-radius:6px;font-size:13px;font-weight:700;" onclick="downloadCompletedExcel()">
+              <i class="fas fa-file-excel"></i> Tải Excel
+            </button>
+          </div>
+        </div>
+
+        <div id="completedSummary" style="display:none; align-items:center; justify-content:space-around; background:var(--suc-lt); padding:12px; border-radius:var(--rad-lg); margin-top:12px; border:1px solid var(--suc); box-shadow:0 2px 4px rgba(14,159,110,.1);">
+          <div style="text-align:center;">
+            <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase;">Tổng Số Phiếu</div>
+            <div id="completedTotalSlips" style="font-size:20px; font-weight:800; color:#065f46;">0</div>
+          </div>
+          <div style="width:1px; height:30px; background:var(--suc); opacity:0.3;"></div>
+          <div style="text-align:center;">
+            <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase;">Tổng Số Lượng Đã Giao</div>
+            <div id="completedTotalQty" style="font-size:20px; font-weight:800; color:var(--dan);">0</div>
+          </div>
+        </div>
+
+        <div style="background:var(--surf);border-radius:var(--rad-lg);border:1px solid var(--bdr);overflow:hidden;margin-top:12px;">
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:700px;">
+              <thead>
+                <tr style="background:var(--suc-lt);border-bottom:2px solid var(--suc);">
+                  <th style="padding:12px 10px;border:1px solid var(--bdr);text-align:center;color:#065f46;font-weight:800;white-space:nowrap;">MÃ ĐƠN</th>
+                  <th style="padding:12px 10px;border:1px solid var(--bdr);text-align:center;color:#065f46;font-weight:800;white-space:nowrap;">NGÀY XUẤT</th>
+                  <th style="padding:12px 10px;border:1px solid var(--bdr);text-align:left;color:#065f46;font-weight:800;white-space:nowrap;">KHÁCH HÀNG</th>
+                  <th style="padding:12px 10px;border:1px solid var(--bdr);text-align:center;color:#065f46;font-weight:800;white-space:nowrap;">SL ĐÃ GIAO</th>
+                  <th style="padding:12px 10px;border:1px solid var(--bdr);color:#065f46;font-weight:800;">GHI CHÚ</th>
+                </tr>
+              </thead>
+              <tbody id="tblSearchCompleted">
+                <tr>
+                  <td colspan="5" style="text-align:center;padding:30px;color:var(--muted);font-style:italic;">
+                    <i class="fas fa-check-circle" style="font-size:24px;margin-bottom:8px;display:block;opacity:0.5;"></i>
+                    Vui lòng chọn tên sản phẩm để bắt đầu tra cứu
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div id="completedPagination" style="display:flex; justify-content:center; align-items:center; gap:6px; margin-top:16px; padding-bottom:16px; flex-wrap:wrap;"></div>
+      </div>
+
+
+      <!-- ========== BÁO CÁO THỐNG KÊ ========== -->
+      <div id="pReport" class="page">
+        <div class="card">
+          <div class="sec-head"><i class="fas fa-chart-line me-2" style="color:var(--fin)"></i>Báo Cáo & Thống Kê</div>
+          
+          <div style="display:flex;gap:16px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--bdr); align-items:center;">
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;cursor:pointer">
+              <input type="radio" name="reportType" value="revenue" checked onchange="renderReport()">
+              <span style="color:var(--pri)"><i class="fas fa-money-bill-wave me-1"></i>Doanh Thu</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;cursor:pointer">
+              <input type="radio" name="reportType" value="product" onchange="renderReport()">
+              <span style="color:var(--warn)"><i class="fas fa-box-open me-1"></i>Sản Phẩm Bán Ra</span>
+            </label>
+            <!-- THÊM NÚT NÀY -->
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;cursor:pointer">
+              <input type="radio" name="reportType" value="store" onchange="renderReport()">
+              <span style="color:var(--info)"><i class="fas fa-store me-1"></i>Doanh Thu Cửa Hàng</span>
+            </label>
+            
+            <div class="ms-auto" style="display:flex; gap:8px;">
+              <button class="btn2 btn-out btn-sm2" onclick="printReport()" style="padding:6px 12px;font-size:12px;border-color:var(--pri);color:var(--pri)">
+                <i class="fas fa-print me-1"></i> In Báo Cáo
+              </button>
+              <button class="btn2 btn-sm2" onclick="exportBaoCaoExcel()" style="padding:6px 12px;font-size:12px;background:#0e9f6e; border-color:#0e9f6e; color:#fff;">
+                <i class="fas fa-file-excel me-1"></i> Tải Báo Cáo 
+              </button>
+            </div>
+
+          </div>
+          <div id="reportGroupBar" class="sh-date-bar" style="display:none;margin-bottom:8px">
+  <label>Nhóm hàng:</label>
+  <div style="display:flex;gap:4px;flex-wrap:wrap">
+    <button class="sdbtn r-grpbtn act" onclick="setReportGroup('all', this)">Tất cả</button>
+    <button class="sdbtn r-grpbtn" onclick="setReportGroup('Đồ Điện', this)">Đồ Điện</button>
+    <button class="sdbtn r-grpbtn" onclick="setReportGroup('Kim Khí', this)">Kim Khí</button>
+    <button class="sdbtn r-grpbtn" onclick="setReportGroup('Khác', this)">Khác</button>
+  </div>
+</div>
+
+          <div class="sh-date-bar">
+            <label>Khoảng thời gian:</label>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <button class="sdbtn r-sdbtn act" onclick="setReportDateMode('today', this)">Hôm nay</button>
+              <button class="sdbtn r-sdbtn" onclick="setReportDateMode('yesterday', this)">Hôm qua</button>
+              <button class="sdbtn r-sdbtn" onclick="setReportDateMode('week', this)">7 ngày</button>
+              <button class="sdbtn r-sdbtn" onclick="setReportDateMode('month', this)">Tháng này</button>
+              <button class="sdbtn r-sdbtn" onclick="setReportDateMode('all', this)">Tất cả</button>
+              <button class="sdbtn r-sdbtn" onclick="setReportDateMode('custom', this)">Tùy chọn</button>
+              <button class="sdbtn hist-all-btn" onclick="toggleHistLoadAll()" title="Đang hiển thị 300 dữ liệu gần nhất — bấm để tải tất cả"><i class="fas fa-eye"></i> Hiện tất cả</button>
+            </div>
+            <div class="sh-custom" id="reportCustomRange" style="display:none">
+              <label style="white-space:nowrap;font-size:11px;font-weight:700;color:var(--muted)">Từ:</label>
+              <input type="date" id="reportDateFrom" class="finput date-inp" onchange="renderReport()" style="flex:1;min-width:0;padding:6px 8px;font-size:12px">
+              <label style="white-space:nowrap;font-size:11px;font-weight:700;color:var(--muted)">Đến:</label>
+              <input type="date" id="reportDateTo" class="finput date-inp" onchange="renderReport()" style="flex:1;min-width:0;padding:6px 8px;font-size:12px">
+            </div>
+          </div>
+        </div>
+
+        <div id="reportRevenueWrap"></div>
+        <div id="reportProductWrap" style="display:none"></div>
+        <div id="reportStoreWrap" style="display:none"></div>
+      </div>
+
+      <!-- ========== XỬ LÝ ĐƠN HÀNG ========== -->
+<div id="pXulydh" class="page">
+  <div class="stat-grid" style="grid-template-columns: repeat(4, 1fr); gap: 5px;">
+    <div class="stat-card" style="padding: 8px 4px; text-align: center;">
+      <div class="slabel" style="font-size: 8.5px; margin-bottom: 2px;">Chờ xử lý</div>
+      <div class="sval" id="xlStatWait" style="color:var(--warn); font-size: 15px;">0</div>
+      <div class="ssub" style="font-size: 8.5px; margin-top: 2px;">Đơn Đã </div>
+    </div>
+    <div class="stat-card" style="padding: 8px 4px; text-align: center;">
+      <div class="slabel" style="font-size: 8.5px; margin-bottom: 2px;">Hoàn thành</div>
+      <div class="sval" id="xlStatFin" style="color:var(--fin); font-size: 15px;">0</div>
+      <div class="ssub" style="font-size: 8.5px; margin-top: 2px;">Đã Xử Lý</div>
+    </div>
+    <div class="stat-card" style="padding: 8px 4px; text-align: center; border-color: #fca5a5; background-color: #fef2f2;">
+      <div class="slabel" style="font-size: 8.5px; margin-bottom: 2px; color: #b91c1c;">Hủy Toa</div>
+      <div class="sval" id="xlStatHuy" style="color:#b91c1c; font-size: 15px;">0</div>
+      <div class="ssub" style="font-size: 8.5px; margin-top: 2px; color: #b91c1c;">đã hủy</div>
+    </div>
+    <div class="stat-card" style="padding: 8px 4px; text-align: center;">
+      <div class="slabel" style="font-size: 8.5px; margin-bottom: 2px;">Doanh thu</div>
+      <div class="sval" id="xlStatRev" style="color:var(--suc); font-size: 12px; word-break: break-all;">0đ</div>
+      <div class="ssub" style="font-size: 8.5px; margin-top: 2px;">Hoàn Thành</div>
+    </div>
   </div>
 
-  <script src="js/config.js"></script>
-  <script src="js/utils.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/order.js"></script>
-  <script src="js/history.js"></script>
-  <script src="js/finance.js"></script>
-  <script src="js/admin.js"></script>
-  <script src="js/auth.js"></script>
-  <script src="js/app.js"></script>
+  <!-- Filter buttons trạng thái + date cũ -->
+  <div class="filter-bar">
+    <button class="fbtn act" id="xlFAll" onclick="xlFilter='all';xlUpdateFilterBtns();renderXuLyUI()">Tất cả</button>
+    <button class="fbtn" id="xlFWait" onclick="xlFilter='dain';xlUpdateFilterBtns();renderXuLyUI()">Chờ xử lý</button>
+    <button class="fbtn" id="xlFFin" onclick="xlFilter='hoanThanh';xlUpdateFilterBtns();renderXuLyUI()">Hoàn thành</button>
+    <button class="fbtn" id="xlFHuy" onclick="xlFilter='huyToa';xlUpdateFilterBtns();renderXuLyUI()">Hủy Toa</button>
+    <input type="date" id="xlDateFilter" class="date-inp" onchange="renderXuLyUI()">
+    <button class="fbtn" onclick="document.getElementById('xlDateFilter').value='';renderXuLyUI()"><i class="fas fa-times"></i></button>
+  </div>
+
+  <!-- Ô tìm kiếm số HĐ -->
+  <div style="display: flex; gap: 10px; margin: 15px 0; align-items: flex-start;">
+    <input type="number"
+           id="xlSearchIdInp"
+           class="inp-mhd-clean"
+           placeholder="Nhập số HĐ..."
+           inputmode="numeric"
+           onkeydown="if(event.key==='Enter'){ event.preventDefault(); searchAndOpenOrder(); }">
+    <button class="btn-ok-3d" onclick="searchAndOpenOrder()">OK</button>
+  </div>
+
+  <!-- ====== THÊM MỚI: Tìm tên khách hàng + Lọc thời gian ====== -->
+  <div class="card" style="margin-bottom: 12px;">
+
+    <!-- Tìm kiếm tên khách hàng -->
+    <div style="margin-bottom: 10px; position: relative;">
+      <input type="text"
+             id="xl_custFilter"
+             class="finput"
+             placeholder="🔍 Tìm nhanh tên khách hàng..."
+             oninput="renderXuLyUI()">
+    </div>
+
+    <!-- Lọc thời gian -->
+    <div class="sh-date-bar">
+      <label style="font-size:12px; font-weight:700; color:var(--muted)">Khoảng thời gian:</label>
+      <div style="display:flex; gap:4px; flex-wrap:wrap;">
+        <button class="sdbtn xl-sdbtn act" onclick="setXlDateMode('all', this)">Tất cả</button>
+        <button class="sdbtn xl-sdbtn" onclick="setXlDateMode('today', this)">Hôm nay</button>
+        <button class="sdbtn xl-sdbtn" onclick="setXlDateMode('yesterday', this)">Hôm qua</button>
+        <button class="sdbtn xl-sdbtn" onclick="setXlDateMode('week', this)">7 ngày</button>
+        <button class="sdbtn xl-sdbtn" onclick="setXlDateMode('month', this)">Tháng này</button>
+        <button class="sdbtn xl-sdbtn" onclick="setXlDateMode('custom', this)">Tùy chọn</button>
+        <button class="sdbtn hist-all-btn" onclick="toggleHistLoadAll()" title="Đang hiển thị 300 dữ liệu gần nhất — bấm để tải tất cả"><i class="fas fa-eye"></i> Hiện tất cả</button>
+      </div>
+      <div class="sh-custom" id="xlCustomRange" style="display:none; margin-top:6px;">
+        <label style="white-space:nowrap; font-size:11px; font-weight:700; color:var(--muted)">Từ:</label>
+        <input type="date" id="xl_dateFrom" class="finput date-inp" onchange="renderXuLyUI()" style="flex:1; min-width:0; padding:6px 8px; font-size:12px">
+        <label style="white-space:nowrap; font-size:11px; font-weight:700; color:var(--muted)">Đến:</label>
+        <input type="date" id="xl_dateTo" class="finput date-inp" onchange="renderXuLyUI()" style="flex:1; min-width:0; padding:6px 8px; font-size:12px">
+      </div>
+    </div>
+
+    <!-- Kết quả đếm -->
+    <div id="xl_resultCount" style="font-size:13px; margin-top:8px; color:var(--muted)"></div>
+  </div>
+  <!-- ====== KẾT THÚC THÊM MỚI ====== -->
+
+  <div id="xlList"></div>
+</div>
+
+      <!-- ========== NHẬP KHO ========== -->
+      <div id="pImport" class="page">
+        <div class="card" style="border-top:3px solid var(--info)">
+          <div class="sec-head" style="color:var(--info)"><i class="fas fa-truck-loading me-2"></i>Nhập kho hàng hóa</div>
+          
+          <div style="position:relative; margin-bottom:4px;">
+            <i class="fas fa-search" style="position:absolute;left:12px;top:18px;transform:translateY(-50%);color:var(--muted);z-index:2;"></i>
+            <input type="text" id="importSearchP" class="finput" autocomplete="off" 
+                   style="padding-left:36px;" 
+                   placeholder="Nhập tên hoặc mã sản phẩm cần nhập kho..." oninput="searchImport()">
+            <div id="importResP"></div>
+          </div>
+          
+        </div>
+        
+        <div id="importCartList"></div>
+        
+        <div class="card" style="border-top:3px solid var(--info);margin-top:4px">
+          <button id="btnSubmitImport" class="btn2 btn-full" style="background:var(--info);color:#fff" onclick="submitImport()">✔ XÁC NHẬN NHẬP KHO</button>
+        </div>
+      </div>
+
+      <!-- ========== LỊCH SỬ NHẬP KHO ========== -->
+      <div id="pImportHistory" class="page">
+        <div class="stat-grid" style="grid-template-columns:1fr 1fr">
+          <div class="stat-card"><div class="slabel">Tổng SL nhập</div><div class="sval" id="statImportTotalQty" style="color:var(--pri)">0</div></div>
+          <div class="stat-card"><div class="slabel">Phiếu nhập</div><div class="sval" id="statImportCount" style="color:var(--suc)">0</div></div>
+        </div>
+        <div id="importHistList"></div>
+      </div>
+<!-- ========== Tra Cứu Hàng Nhập Kho ========== -->
+      <div id="pSearchImport" class="page" style="display:none;">
+        <div style="text-align:center;margin-bottom:18px;">
+          <h2 style="color:var(--info);font-weight:800;font-size:22px;letter-spacing:1px;text-transform:uppercase;">
+            📊 TRA CỨU HÀNG NHẬP KHO
+          </h2>
+        </div>
+       <!-- === BẮT ĐẦU KHU VỰC THỐNG KÊ (THÊM MỚI Ở ĐÂY) === -->
+        <div id="importSummaryStats" style="display: none; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+           <div style="flex: 1; min-width: 150px; border: 1px solid var(--info); border-radius: 8px; padding: 12px 16px; background: var(--info-lt); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+              <div style="font-size: 11px; color: var(--info); font-weight: 700; text-transform: uppercase;">Tổng SL Nhập</div>
+              <div id="sumTotalQty" style="font-size: 24px; color: var(--pri); font-weight: 800; margin-top: 4px;">0</div>
+           </div>
+           
+           <div style="flex: 1; min-width: 150px; border: 1px solid #10b981; border-radius: 8px; padding: 12px 16px; background: #ecfdf5; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+              <div style="font-size: 11px; color: #047857; font-weight: 700; text-transform: uppercase;">Phiếu Nhập</div>
+              <div id="sumReceipts" style="font-size: 24px; color: #059669; font-weight: 800; margin-top: 4px;">0</div>
+           </div>
+        </div>
+        <div class="card" style="border-top:3px solid var(--info); padding: 16px;">
+          <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;display:block">
+            Nhập hoặc chọn tên sản phẩm cần tra cứu
+          </label>
+          <div style="position:relative;">
+            <i class="fas fa-search" style="position:absolute;left:12px;top:18px;transform:translateY(-50%);color:var(--muted);z-index:2;"></i>
+            
+            <input type="text" id="inpSearchImportHistory" class="finput" autocomplete="off"
+                   style="padding-left:36px;"
+                   placeholder="Nhập tên hoặc mã sản phẩm..." oninput="searchProductForHistory()">
+            <div id="resSearchImportHistory"></div>
+          </div>
+        </div>
+
+        <!-- ===== THANH LỌC THỜI GIAN + NÚT TẢI EXCEL ===== -->
+        <div class="card" style="padding:12px 16px; margin-top:12px; display:block; text-align:left; direction:ltr;">
+          <div style="display:inline-block;vertical-align:bottom;margin:0 12px 8px 0;text-align:left;">
+            <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;display:block;">Từ ngày</label>
+            <input type="date" id="inpImportFrom" class="finput" style="width:150px;" onchange="rerunImportSearch()">
+          </div>
+          <div style="display:inline-block;vertical-align:bottom;margin:0 12px 8px 0;text-align:left;">
+            <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;display:block;">Đến ngày</label>
+            <input type="date" id="inpImportTo" class="finput" style="width:150px;" onchange="rerunImportSearch()">
+          </div>
+          <div style="display:inline-block;vertical-align:bottom;margin:0 12px 8px 0;text-align:left;">
+      <button type="button" class="btn2 btn-out" style="padding:7px 12px;border-radius:6px;font-size:12px;margin:0 6px 6px 0;" onclick="setQuickDateRange('import','today')">Hôm nay</button>
+      <button type="button" class="btn2 btn-out" style="padding:7px 12px;border-radius:6px;font-size:12px;margin:0 6px 6px 0;" onclick="setQuickDateRange('import','7d')">7 ngày</button>
+      <button type="button" class="btn2 btn-out" style="padding:7px 12px;border-radius:6px;font-size:12px;margin:0 6px 6px 0;" onclick="setQuickDateRange('import','month')">Tháng này</button>
+      <button type="button" class="btn2 btn-out" style="padding:7px 12px;border-radius:6px;font-size:12px;margin:0 6px 6px 0;" onclick="setQuickDateRange('import','lastmonth')">Tháng trước</button>
+      <button type="button" class="btn2 btn-out" style="padding:7px 12px;border-radius:6px;font-size:12px;margin:0 6px 6px 0;" onclick="setQuickDateRange('import','all')">Tất cả</button>
+          </div>
+          <div style="display:inline-block;vertical-align:bottom;margin:0 0 8px 0;">
+            <button type="button" class="btn2 btn-suc" style="padding:8px 14px;border-radius:6px;font-size:13px;font-weight:700;" onclick="downloadImportExcel()">
+              <i class="fas fa-file-excel"></i> Tải Excel
+            </button>
+          </div>
+        </div>
+
+        <div style="background:var(--surf);border-radius:var(--rad-lg);border:1px solid var(--bdr);overflow:hidden;margin-top:12px;">
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:600px;">
+              <thead>
+                <tr style="background:#e0f5f5;border-bottom:2px solid #0694a2;">
+                  <th style="padding:12px 10px;border:1px solid var(--bdr);text-align:center;color:#057a55;font-weight:800;white-space:nowrap;">MÃ NHẬP KHO</th>
+                  <th style="padding:12px 10px;border:1px solid var(--bdr);text-align:center;color:#057a55;font-weight:800;white-space:nowrap;">NGÀY</th>
+                  <th style="padding:12px 10px;border:1px solid var(--bdr);text-align:center;color:#057a55;font-weight:800;white-space:nowrap;">SỐ LƯỢNG</th>
+                  <th style="padding:12px 10px;border:1px solid var(--bdr);color:#057a55;font-weight:800;">GHI CHÚ</th>
+                </tr>
+              </thead>
+              <tbody id="tblSearchImportHistory">
+                <tr>
+                  <td colspan="4" style="text-align:center;padding:30px;color:var(--muted);font-style:italic;">
+                    <i class="fas fa-box-open" style="font-size:24px;margin-bottom:8px;display:block;opacity:0.5;"></i>
+                    Vui lòng chọn tên sản phẩm để bắt đầu tra cứu
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <!-- ========== TRA CỨU ========== -->
+      <div id="pSearchHistory" class="page">
+        <div class="card">
+          <div class="sec-head"><i class="fas fa-search me-2"></i>Tra cứu lịch sử bán hàng</div>
+          <div style="display:flex;gap:16px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--bdr)">
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;cursor:pointer">
+              <input type="radio" name="shSearchType" id="shTypeProduct" value="product" checked onchange="clearSearchHistory()">
+              <span style="color:var(--pri)"><i class="fas fa-box me-1"></i>Theo sản phẩm</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;cursor:pointer">
+              <input type="radio" name="shSearchType" id="shTypeCustomer" value="customer" onchange="clearSearchHistory()">
+              <span style="color:var(--suc)"><i class="fas fa-user me-1"></i>Theo khách hàng</span>
+            </label>
+          </div>
+          <div class="sh-date-bar">
+            <label>Khoảng thời gian:</label>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <button class="sdbtn act" onclick="setDateMode('all',this)">Tất cả</button>
+              <button class="sdbtn" onclick="setDateMode('today',this)">Hôm nay</button>
+              <button class="sdbtn" onclick="setDateMode('yesterday',this)">Hôm qua</button>
+              <button class="sdbtn" onclick="setDateMode('week',this)">7 ngày</button>
+              <button class="sdbtn" onclick="setDateMode('month',this)">Tháng này</button>
+              <button class="sdbtn" onclick="setDateMode('custom',this)">Tùy chọn</button>
+            </div>
+            <div class="sh-custom" id="shCustomRange" style="display:none">
+              <label style="white-space:nowrap;font-size:11px;font-weight:700;color:var(--muted)">Từ:</label>
+              <input type="date" id="shDateFrom" class="finput date-inp" onchange="triggerShSearch()" style="flex:1;min-width:0;padding:6px 8px;font-size:12px">
+              <label style="white-space:nowrap;font-size:11px;font-weight:700;color:var(--muted)">Đến:</label>
+              <input type="date" id="shDateTo" class="finput date-inp" onchange="triggerShSearch()" style="flex:1;min-width:0;padding:6px 8px;font-size:12px">
+            </div>
+          </div>
+          <div style="position:relative">
+            <input type="text" id="shSearchInp" class="finput" placeholder="Nhập từ khóa tìm kiếm..." oninput="handleSearchHistory(this.value)" style="font-size:14px;padding:11px 14px">
+            <div id="shSuggestions" class="search-res" style="display:none;position:absolute;width:100%;z-index:50;top:calc(100% + 4px)"></div>
+          </div>
+        </div>
+        <div id="shResults"></div>
+      </div>
+
+      <!-- ========== THÊM KHÁCH HÀNG ========== -->
+      <div id="pAddCust" class="page">
+        <div class="card" style="border-top:3px solid var(--suc)">
+          <div class="sec-head" style="color:var(--suc)"><i class="fas fa-user-plus me-2"></i>Thêm khách hàng mới</div>
+          <div style="margin-bottom:8px">
+            <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Tên khách hàng *</label>
+            <input type="text" id="ncName" class="finput" placeholder="Nhập họ tên...">
+          </div>
+          <div style="margin-bottom:8px">
+            <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Số điện thoại *</label>
+            <input type="text" id="ncPhone" class="finput" placeholder="0901234567">
+          </div>
+          <div style="margin-bottom:16px">
+            <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Địa chỉ đầy đủ *</label>
+            <input type="text" id="ncAddr" class="finput" placeholder="Số nhà, đường, quận/huyện...">
+          </div>
+          <button class="btn2 btn-suc btn-full" onclick="saveNewCust()">LƯU THÔNG TIN KHÁCH HÀNG</button>
+        </div>
+      </div>
+
+      <!-- ========== BẢN ĐỒ ========== -->
+      <div id="pMap" class="page">
+        <div class="card">
+          <div class="sec-head"><i class="fas fa-map-marker-alt me-2 text-danger"></i>Vị trí & Chỉ đường</div>
+          <div style="margin-bottom:8px">
+            <input type="text" id="mapCustInp" list="custDl" class="finput" placeholder="Nhập tên khách hàng để tìm vị trí..." onchange="onMapCustChange()" oninput="onMapCustChange()">
+          </div>
+          <div id="mapAddrDisplay" style="margin-bottom:8px;font-size:12px;color:var(--muted)"><i>📍 Địa chỉ sẽ hiển thị tại đây</i></div>
+          <button class="btn2 btn-pri btn-full mb-3" id="btnOpenMaps" onclick="openGoogleMaps()" disabled>
+            <i class="fas fa-directions me-2"></i>Mở Google Maps
+          </button>
+          <div id="mapFrameContainer"><div style="text-align:center;color:var(--muted)"><i class="fas fa-map fa-3x mb-3"></i><br>Chọn khách hàng để xem bản đồ</div></div>
+        </div>
+      </div>
+
+      <!-- ========== KHÁCH HÀNG ========== -->
+      <div id="pCustomers" class="page">
+        <div class="card">
+          <div class="sec-head"><i class="fas fa-users me-2 text-primary"></i>Danh sách khách hàng</div>
+          <div style="margin-bottom:12px">
+            <input type="text" id="searchCustList" class="finput" placeholder="🔍 Tìm tên khách hàng..." oninput="currentCustPage=1;renderCustomerList()">
+          </div>
+          <div id="custListTable"></div>
+          <div class="pag" id="custPagination"></div>
+        </div>
+      </div>
+
+      <!-- ========== LỊCH SỬ HÓA ĐƠN ========== -->
+<div id="pLichSuHoaDon" class="page">
+        <div class="stat-grid" style="grid-template-columns:1fr 1fr;margin-bottom:10px">
+          <div class="stat-card" style="border-left:4px solid var(--fin)">
+            <div class="slabel">Tổng doanh thu</div>
+            <div class="sval" id="lshd_statRev" style="color:var(--fin);font-size:15px">0đ</div>
+            <div class="ssub" id="lshd_statSub">Hóa đơn hoàn thành</div>
+          </div>
+          <div class="stat-card" style="border-left:4px solid var(--suc)">
+            <div class="slabel">Số hóa đơn</div>
+            <div class="sval" id="lshd_statCount" style="color:var(--suc)">0</div>
+            <div class="ssub">đơn hoàn thành</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="sec-head"><i class="fas fa-receipt me-2" style="color:var(--fin)"></i>Lịch Sử Hóa Đơn Hoàn Thành</div>
+          <div id="lshd_saleToggleWrap" style="display:none;gap:6px;margin-bottom:10px">
+            <button id="lshd_btn_all" class="lshd-mode-btn fbtn act" onclick="lshdSetMode('all')">Tất cả</button>
+            <button id="lshd_btn_personal" class="lshd-mode-btn fbtn" onclick="lshdSetMode('personal')">Cá nhân</button>
+          </div>
+          <div id="lshd_staffWrap" style="display:none;margin-bottom:8px">
+            <div style="margin-bottom:12px; position:relative;">
+              <input type="text" id="lshd_custFilter" class="finput" placeholder="🔍 Tìm nhanh tên khách hàng..." oninput="renderLichSuHoaDon()">
+            </div>
+            <select id="lshd_staffFilter" class="finput fselect" onchange="renderLichSuHoaDon()" style="padding:7px 28px 7px 10px;font-size:13px">
+              <option value="ALL">Tất cả nhân viên</option>
+            </select>
+          </div>
+
+          <div class="sh-date-bar" style="margin-bottom: 12px;">
+            <label style="font-size:12px;font-weight:700;color:var(--muted)">Khoảng thời gian:</label>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <button class="sdbtn lshd-sdbtn act" onclick="setLshdDateMode('all', this)">Tất cả</button>
+              <button class="sdbtn lshd-sdbtn" onclick="setLshdDateMode('today', this)">Hôm nay</button>
+              <button class="sdbtn lshd-sdbtn" onclick="setLshdDateMode('yesterday', this)">Hôm qua</button>
+              <button class="sdbtn lshd-sdbtn" onclick="setLshdDateMode('week', this)">7 ngày</button>
+              <button class="sdbtn lshd-sdbtn" onclick="setLshdDateMode('month', this)">Tháng này</button>
+              <button class="sdbtn lshd-sdbtn" onclick="setLshdDateMode('custom', this)">Tùy chọn</button>
+              <button class="sdbtn hist-all-btn" onclick="toggleHistLoadAll()" title="Đang hiển thị 300 dữ liệu gần nhất — bấm để tải tất cả"><i class="fas fa-eye"></i> Hiện tất cả</button>
+            </div>
+            <div class="sh-custom" id="lshdCustomRange" style="display:none; margin-top:6px;">
+              <label style="white-space:nowrap;font-size:11px;font-weight:700;color:var(--muted)">Từ:</label>
+              <input type="date" id="lshd_dateFrom" class="finput date-inp" onchange="renderLichSuHoaDon()" style="flex:1;min-width:0;padding:6px 8px;font-size:12px">
+              <label style="white-space:nowrap;font-size:11px;font-weight:700;color:var(--muted)">Đến:</label>
+              <input type="date" id="lshd_dateTo" class="finput date-inp" onchange="renderLichSuHoaDon()" style="flex:1;min-width:0;padding:6px 8px;font-size:12px">
+            </div>
+          </div>
+          <div id="lshdList"></div>
+        </div>
+      </div>
+
+      <!-- ========== LỊCH SỬ CÔNG NỢ ========== -->
+      <div id="pLichSuCongNo" class="page">
+        <div class="card">
+          <div class="sec-head" style="display:flex;justify-content:space-between;align-items:center;">
+  <span><i class="fas fa-file-invoice-dollar me-2" style="color:var(--warn)"></i>Lịch Sử Công Nợ</span>
+  <button type="button" class="btn-3d-excel" onclick="downloadCongNoExcel()" style="background-color:#0ea5e9 !important;color:#fff !important;border:none !important;padding:6px 14px !important;font-size:12px !important;font-weight:700 !important;border-radius:8px !important;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;box-shadow:0 4px 0 #0284c7,0 6px 10px rgba(0,0,0,.15) !important;">
+    <i class="fas fa-file-excel" style="font-size:14px;"></i> TẢI FILE EXCEL
+  </button>
+</div>
+<div style="margin-bottom:12px">
+  <input type="text" id="searchCongNo" class="finput" placeholder="🔍 Tìm tên khách hàng có công nợ..." oninput="renderCongNoList()">
+</div>
+          <div id="congNoSummary" style="background:var(--warn-lt);border:1.5px solid var(--warn);border-radius:var(--rad);padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--warn)">Tổng công nợ</div>
+              <div style="font-size:20px;font-weight:700;color:var(--warn)" id="congNoTotal">0đ</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Số khách có nợ</div>
+              <div style="font-size:20px;font-weight:700;color:var(--dan)" id="congNoCount">0</div>
+            </div>
+          </div>
+          <div id="congNoTable"></div>
+          <div class="pag" id="congNoPagination"></div>
+        </div>
+      </div>
+
+      <!-- ========== THANH TOÁN ========== -->
+      <div id="pThanhToan" class="page">
+        <div class="card">
+          <div class="sec-head"><i class="fas fa-wallet me-2" style="color:var(--suc)"></i>Tra Cứu Thanh Toán & Công Nợ</div>
+          <div style="position:relative;margin-bottom:8px">
+            <input type="text" id="ttSearchInp" class="finput" placeholder="🔍 Nhập tên khách hàng..." oninput="searchThanhToan()" autocomplete="off">
+            <div id="ttSearchRes"></div>
+          </div>
+          <div id="ttResult" style="display:none">
+            <div style="background:var(--pri-lt);border-radius:8px;padding:10px;margin-bottom:12px">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:3px">Khách hàng</div>
+              <div style="font-size:15px;font-weight:700;color:var(--pri)" id="ttCustName"></div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px" id="ttCustAddr"></div>
+              <div style="font-size:12px;color:var(--muted);margin-top:2px" id="ttCustPhone"></div>
+            </div>
+            
+            <!-- KHỐI CÔNG NỢ & PREVIEW GỘP CHUNG VÀO ĐÂY -->
+            <div id="ttDebtBox" style="border:2px solid var(--warn);background:var(--warn-lt);border-radius:var(--rad-lg);padding:14px;text-align:center;margin-bottom:12px">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px" id="ttDebtLabel">Công Nợ Hiện Tại</div>
+              <div style="font-size:28px;font-weight:700" id="ttDebtAmount">0 VNĐ</div>
+              
+              <!-- BẮT ĐẦU: KHUNG HIỂN THỊ NHÁP (PREVIEW) ĐÃ CHUI VÀO TRONG -->
+              <div id="ttPaymentPreview" style="display:none; margin-top:10px; padding-top:10px; border-top:1px dashed var(--warn); font-size:13px; text-align:center;">
+              </div>
+              <!-- KẾT THÚC: KHUNG HIỂN THỊ NHÁP -->
+            </div>
+
+            <div style="background:var(--bg);border:1.5px solid var(--bdr);border-radius:var(--rad);padding:14px;margin-bottom:12px">
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">💰 Nhập Số Tiền Thanh Toán</div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <div style="position:relative;flex:1">
+                  <input type="text" id="ttPayInp" class="finput" placeholder="0" oninput="formatPayInput(this)" onblur="formatPayInputOnBlur(this)" style="font-size:18px;font-weight:700;color:var(--fin);text-align:right;padding-right:40px">
+                  <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:700;color:var(--muted)">VNĐ</span>
+                </div>
+                <button id="ttPayBtn" class="btn2 btn-suc" onclick="thanhToanCongNo()" style="white-space:nowrap;padding:9px 16px">
+                  <i class="fas fa-check me-1"></i>Xác nhận
+                </button>
+              </div>
+
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center">
+                <button class="btn2 btn-out btn-sm2" onclick="quickFill(500000)">500K</button>
+                <button class="btn2 btn-out btn-sm2" onclick="quickFill(1000000)">1 Triệu</button>
+                <button class="btn2 btn-out btn-sm2" onclick="quickFill(2000000)">2 Triệu</button>
+                <button class="btn2 btn-out btn-sm2" onclick="quickFill(5000000)">5 Triệu</button>
+                <button class="btn2 btn-out btn-sm2" onclick="fillFullDebt()" style="color:var(--warn);border-color:var(--warn)">Trả hết nợ</button>
+                <div style="display:flex;align-items:center;gap:4px;margin-left:4px;flex:1;min-width:140px">
+                  <span style="font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap">Người thu:</span>
+                  <input type="text" id="ttNguoiThu" class="finput" placeholder="Nhập tên..." style="padding:5px 8px;font-size:12px;flex:1">
+                </div>
+              </div>
+            </div>
+            <div style="background:var(--bg);border-radius:var(--rad);padding:12px">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Lịch sử đơn hoàn thành</div>
+              <div id="ttOrderHistory"></div>
+            </div>
+          </div>
+          <div id="ttEmpty" style="text-align:center;padding:40px 20px;color:var(--muted)">
+            <div style="font-size:36px;margin-bottom:10px">💳</div>
+            <div style="font-weight:600;font-size:14px">Tìm khách hàng để xem công nợ</div>
+            <div style="font-size:12px;margin-top:4px">Nhập tên khách hàng vào ô tìm kiếm phía trên</div>
+          </div>
+        </div>
+      </div>
+      <!-- ========== Bảo Hành ========== -->
+        <div id="pBaoHanh" class="page">
+        <div class="card" style="border-top:3px solid var(--warn)">
+          <div class="sec-head" style="color:var(--warn)"><i class="fas fa-shield-alt me-2"></i>Nhập Bảo Hành</div>
+          
+          <div style="margin-bottom:12px">
+            <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;display:block">1. Khách Hàng *</label>
+            <input type="text" id="bhCustInp" class="finput" placeholder="🔍 Tìm hoặc chọn khách hàng..." 
+       oninput="searchCustSuggest(this,'bhCustSuggestions')" autocomplete="off">
+<div id="bhCustSuggestions"></div>
+          </div>
+
+          <div style="margin-bottom:4px">
+            <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;display:block">2. Sản Phẩm *</label>
+            <input type="text" id="bhSearchP" class="finput" placeholder="🔍 Nhập tên sản phẩm bảo hành..." oninput="searchBaoHanh()">
+          </div>
+          <div id="bhResP"></div>
+        </div>
+        
+        <div id="bhCartList"></div>
+        
+        <div class="card" style="border-top:3px solid var(--warn);margin-top:4px">
+          <button id="btnSubmitBaoHanh" class="btn2 btn-full btn-warn" onclick="submitBaoHanh()">✔ LƯU BẢO HÀNH</button>
+        </div>
+      </div>
+      <!-- ==========Lịch  Bảo Hành Không Bán Được ========== -->
+      <div id="pLsBHKBD" class="page" style="display:none; width:100% !important; max-width:100% !important; padding:10px 8px;">
+  <!-- 1. Làm thanh tiêu đề và tìm kiếm đứng yên -->
+    <div style="position: sticky; top: 56px; z-index: 105; background: var(--surf); padding: 10px 0; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid var(--bdr); flex-wrap: wrap; gap: 10px;">
+      <span style="font-size:16px; font-weight:800; text-transform:uppercase; color:var(--info);">
+        <i class="fas fa-table me-2"></i>Lịch Sử BH Không Bán Được
+      </span>
+      
+      <div style="position:relative; flex:1; min-width:220px; max-width:400px;">
+         <i class="fas fa-search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--muted);"></i>
+         <input type="text" id="filterLsBHKBDInp" class="finput" placeholder="Tìm tên sản phẩm để lọc bảng..." oninput="suggestFilterLsBHKBD(this)" autocomplete="off" style="padding:6px 12px 6px 32px; font-size:13px;">
+         <div id="suggestLsBHKBDBox" style="position:absolute; width:100%; top:100%; left:0; z-index:100; background:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.15); border-radius:0 0 8px 8px;"></div>
+      </div>
+
+      <button onclick="loadLsBHKBD()"
+        onmousedown="this.style.transform='translateY(2px)'; this.style.boxShadow='0 1px 2px rgba(0,0,0,0.08)';"
+        onmouseup="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.08)';"
+        style="background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,0.08); font-weight:600; color:#475569; padding:4px 12px; font-size:13px; cursor:pointer; transition:0.1s;">
+        <i class="fas fa-sync-alt" style="color:#0ea5e9; margin-right:4px;"></i> Làm mới
+      </button>
+    </div>
+
+    <div style="overflow-x:auto; width:100%;">
+      <table style="width:100%; border-collapse:collapse; min-width:900px; font-size:13px;">
+        <!-- 2. Làm hàng tiêu đề của bảng đứng yên ngay bên dưới -->
+        <thead style="position: sticky; top: 110px; z-index: 104; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+          <tr style="background:#e0f5f5; border-bottom:2px solid #0694a2;">
+
+    <div style="overflow-x:auto; width:100%;">
+      <table style="width:100%; border-collapse:collapse; min-width:900px; font-size:13px;">
+        <thead>
+          <tr style="background:#e0f5f5; border-bottom:2px solid #0694a2;">
+            <th style="padding:10px 8px; border:1px solid #e5e7eb; white-space:nowrap;">Mã ĐBH</th>
+            <th style="padding:10px 8px; border:1px solid #e5e7eb; white-space:nowrap;">Ngày</th>
+            <th style="padding:10px 8px; border:1px solid #e5e7eb; white-space:nowrap;">Tên Khách Hàng</th>
+            <th style="padding:10px 8px; border:1px solid #e5e7eb;">Tên Sản Phẩm</th>
+            <th style="padding:10px 8px; border:1px solid #e5e7eb; text-align:center;">SL</th>
+            <th style="padding:10px 8px; border:1px solid #e5e7eb;">Ghi chú</th>
+            <th style="padding:10px 8px; border:1px solid #e5e7eb; text-align:center; white-space:nowrap;">Trạng thái</th>
+            <th style="padding:10px 8px; border:1px solid #e5e7eb; text-align:center; white-space:nowrap;">Xóa</th>
+          </tr>
+        </thead>
+        <tbody id="tblLsBHKBD">
+          <tr><td colspan="8" style="text-align:center; padding:20px; font-style:italic; color:var(--muted);">Nhấn "Làm mới" để tải dữ liệu.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div id="pBaoHanhBD" class="page" style="display:none;">
+  <div class="card" style="border-top:3px solid var(--suc)">
+    <div class="sec-head" style="color:var(--suc)"><i class="fas fa-box-open me-2"></i>Nhập Bảo Hành Bán Được (Cộng Kho)</div>
+    <div style="margin-bottom:12px">
+      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;display:block">1. Khách Hàng *</label>
+      <input type="text" id="bhBDCustInp" class="finput" placeholder="🔍 Tìm khách hàng..." 
+       oninput="searchCustSuggest(this,'bhBDCustSuggestions')" autocomplete="off">
+<div id="bhBDCustSuggestions"></div>
+    </div>
+    <div style="margin-bottom:4px">
+      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;display:block">2. Sản Phẩm *</label>
+      <input type="text" id="bhBDSearchP" class="finput" placeholder="🔍 Tìm sản phẩm nhập lại kho..." oninput="searchBaoHanhBD()">
+    </div>
+    <div id="bhBDResP"></div>
+  </div>
+  <div id="bhBDCartList"></div>
+  <div class="card" style="margin-top:4px">
+    <button id="btnSubmitBaoHanhBD" class="btn2 btn-full btn-suc" onclick="submitBaoHanhBD()">✔ LƯU & CỘNG KHO</button>
+  </div>
+</div>
+<!-- ==========Lịch  Bảo Hành Bán Được ========== -->
+<div id="pLsBHBD" class="page" style="display:none; padding:10px 4px;">
+  <div style="background:var(--surf); border-radius:var(--rad-lg); border:1px solid var(--bdr); border-top:3px solid var(--suc); padding:12px 10px;">
+    <!-- 1. Làm thanh tiêu đề và tìm kiếm đứng yên -->
+    <div style="position: sticky; top: 56px; z-index: 105; background: var(--surf); padding: 10px 0; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid var(--bdr); flex-wrap: wrap; gap: 10px;">
+      <span style="font-size:16px; font-weight:900; text-transform:uppercase; color:var(--suc); text-shadow:1px 1px 2px rgba(0,0,0,0.1);">
+        <i class="fas fa-clipboard-list me-2"></i>Lịch Sử BH Bán Được
+      </span>
+      
+      <div style="position:relative; flex:1; min-width:220px; max-width:400px;">
+         <i class="fas fa-search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--muted);"></i>
+         <input type="text" id="filterLsBHBDInp" class="finput" placeholder="Tìm tên sản phẩm để lọc bảng..." oninput="suggestFilterLsBHBD(this)" autocomplete="off" style="padding:6px 12px 6px 32px; font-size:13px;">
+         <div id="suggestLsBHBDBox" style="position:absolute; width:100%; top:100%; left:0; z-index:100; background:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.15); border-radius:0 0 8px 8px;"></div>
+      </div>
+
+      <button onclick="loadLsBHBD()"
+        onmousedown="this.style.transform='translateY(2px)'; this.style.boxShadow='0 1px 2px rgba(0,0,0,0.2)'; this.style.borderBottomWidth='1px';"
+        onmouseup="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.15)'; this.style.borderBottomWidth='3px';"
+        onmouseleave="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.15)'; this.style.borderBottomWidth='3px';"
+        style="background:linear-gradient(to bottom,#ffffff,#e0e0e0); border:1px solid #ccc; border-bottom:3px solid #999; border-radius:12px; padding:6px 16px; font-weight:bold; color:#333; box-shadow:0 4px 6px rgba(0,0,0,0.15); cursor:pointer; transition:all 0.1s;">
+        🔄 Làm mới
+      </button>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse: collapse; min-width: 1100px; font-size: 13px;">
+        <!-- 2. Làm hàng tiêu đề của bảng đứng yên ngay bên dưới -->
+        <thead style="position: sticky; top: 110px; z-index: 104; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+          <tr style="background:#e8f5e9; border-bottom:2px solid #2e7d32;">
+    <div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse: collapse; min-width: 1100px; font-size: 13px;">
+        <thead>
+          <tr style="background:#e8f5e9; border-bottom:2px solid #2e7d32;">
+            <th style="padding:10px 8px; border:1px solid #e5e7eb; white-space:nowrap;">Mã ĐBH</th>
+            <th style="padding:10px 8px; border:1px solid #e5e7eb; white-space:nowrap;">Ngày</th>
+            <th style="padding:10px 8px; border:1px solid #e5e7eb; white-space:nowrap;">Tên Khách Hàng</th>
+            <th style="padding:10px 8px; border:1px solid #e5e7eb;">Tên Sản Phẩm</th>
+            <th style="padding:10px 8px; border:1px solid #e5e7eb; text-align:center;">SL</th>
+            <th style="padding:10px 8px; border:1px solid #e5e7eb; white-space:nowrap;">Ghi chú</th>
+            <th style="padding:10px 8px; border:1px solid #e5e7eb; text-align:center; white-space:nowrap; min-width:120px;">Trạng thái</th>
+            <th style="padding:10px 8px; border:1px solid #e5e7eb; text-align:center; white-space:nowrap;">Xóa</th>
+          </tr>
+        </thead>
+        <tbody id="tblLsBHBD">
+          <tr><td colspan="8" style="text-align:center; padding:20px; font-style:italic; color:var(--muted);">Nhấn "Làm mới" để tải dữ liệu.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+      <!-- ========== LỊCH SỬ THANH TOÁN (SỔ CÁI TỔNG) ========== -->
+      <div id="pLichSuThanhToan" class="page">
+        <!-- Khối thống kê -->
+       <!-- Thay đổi grid-template-columns và thêm ô thứ 3 -->
+<div class="stat-grid" style="grid-template-columns:1fr 1fr 1fr; margin-bottom:12px;">
+  <div class="stat-card" style="border-left:4px solid var(--suc)">
+    <div class="slabel">Tổng tiền đã thu</div>
+    <div class="sval" id="lsttStatTotal" style="color:var(--suc)">0đ</div>
+  </div>
+  <div class="stat-card" style="border-left:4px solid var(--info)">
+    <div class="slabel">Số lượt giao dịch</div>
+    <div class="sval" id="lsttStatCount" style="color:var(--info)">0</div>
+  </div>
+  <!-- ← THÊM Ô MỚI -->
+  <div class="stat-card" style="border-left:4px solid var(--warn)">
+    <div class="slabel">Dư Nợ Hiện Tại</div>
+    <div class="sval" id="lsttStatConLai" style="color:var(--warn);font-size:14px">0đ</div>
+    <div class="ssub">Tổng dư nợ KH lọc</div>
+  </div>
+</div>
+
+        <div class="card">
+          <div class="sec-head"><i class="fas fa-history me-2" style="color:var(--suc)"></i>Sổ Cái - Lịch Sử Giao Dịch</div>
+          
+          <!-- Thanh tìm kiếm khách hàng -->
+          <div style="margin-bottom:12px; position:relative;">
+            <input type="text" id="lsttSearchGlobalInp" class="finput" placeholder="🔍 Nhập tên khách hàng để lọc nhanh..." oninput="renderAllLichSuThanhToan()">
+          </div>
+
+          <!-- Thanh chọn ngày SIÊU ĐỈNH -->
+          <div class="sh-date-bar">
+            <label>Khoảng thời gian:</label>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <button class="sdbtn lstt-sdbtn act" onclick="setLsttDateMode('all', this)">Tất cả</button>
+              <button class="sdbtn lstt-sdbtn" onclick="setLsttDateMode('today', this)">Hôm nay</button>
+              <button class="sdbtn lstt-sdbtn" onclick="setLsttDateMode('yesterday', this)">Hôm qua</button>
+              <button class="sdbtn lstt-sdbtn" onclick="setLsttDateMode('week', this)">7 ngày</button>
+              <button class="sdbtn lstt-sdbtn" onclick="setLsttDateMode('month', this)">Tháng này</button>
+              <button class="sdbtn lstt-sdbtn" onclick="setLsttDateMode('custom', this)">Tùy chọn</button>
+            </div>
+            <div class="sh-custom" id="lsttCustomRange" style="display:none">
+              <label style="white-space:nowrap;font-size:11px;font-weight:700;color:var(--muted)">Từ:</label>
+              <input type="date" id="lsttDateFrom" class="finput date-inp" onchange="renderAllLichSuThanhToan()" style="flex:1;min-width:0;padding:6px 8px;font-size:12px">
+              <label style="white-space:nowrap;font-size:11px;font-weight:700;color:var(--muted)">Đến:</label>
+              <input type="date" id="lsttDateTo" class="finput date-inp" onchange="renderAllLichSuThanhToan()" style="flex:1;min-width:0;padding:6px 8px;font-size:12px">
+            </div>
+          </div>
+
+          <!-- Nơi hiển thị danh sách -->
+          <div id="lsttAllHistoryContainer" style="margin-top:12px;"></div>
+        </div>
+      </div>
+
+      <!-- ========== SẢN PHẨM ========== -->
+      <div id="pProducts" class="page">
+        <style>
+          .btn-3d-excel {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background-color: #0ea5e9 !important; 
+            color: #ffffff !important;
+            border: none !important;
+            padding: 6px 14px !important;
+            font-size: 12px !important;
+            font-weight: 700 !important;
+            border-radius: 8px !important;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.1s ease;
+            box-shadow: 0 4px 0 #0284c7, 0 6px 10px rgba(0, 0, 0, 0.15) !important;
+          }
+          .btn-3d-excel:hover {
+            background-color: #38bdf8 !important;
+          }
+          .btn-3d-excel:active {
+            transform: translateY(3px) !important; 
+            box-shadow: 0 1px 0 #0284c7, 0 2px 4px rgba(0, 0, 0, 0.2) !important; 
+          }
+          /* BẢNG NGANG VỪA KHÍT MÀN HÌNH ĐIỆN THOẠI (CHUẨN 100%) */
+          @media screen and (max-width: 768px) {
+            table:has(#detailTableBody) th:nth-child(2),
+            table:has(#detailTableBody) td:nth-child(2),
+            table:has(#detailTableBody) th:nth-child(6),
+            table:has(#detailTableBody) td:nth-child(6),
+            table:has(#detailTableBody) th:nth-child(7),
+            table:has(#detailTableBody) td:nth-child(7) {
+              display: none !important;
+            }
+            .table-responsive { overflow-x: hidden !important; }
+            table:has(#detailTableBody) {
+              width: 100% !important;
+              max-width: 100% !important;
+              table-layout: fixed !important; 
+              font-size: 10px !important;
+              margin-bottom: 0 !important;
+            }
+            table:has(#detailTableBody) th,
+            table:has(#detailTableBody) td {
+              padding: 4px 2px !important; 
+              vertical-align: middle !important;
+              white-space: normal !important; 
+              word-wrap: break-word !important;
+              overflow-wrap: break-word !important;
+            }
+            table:has(#detailTableBody) th:nth-child(1),
+            table:has(#detailTableBody) td:nth-child(1) { width: 5%; text-align: center !important;} 
+            table:has(#detailTableBody) th:nth-child(3),
+            table:has(#detailTableBody) td:nth-child(3) { width: 45%; text-align: left !important; } 
+            table:has(#detailTableBody) th:nth-child(4),
+            table:has(#detailTableBody) td:nth-child(4) { width: 10%; text-align: center !important; } 
+            table:has(#detailTableBody) th:nth-child(5),
+            table:has(#detailTableBody) td:nth-child(5) { width: 14%; text-align: right !important; } 
+            table:has(#detailTableBody) th:nth-child(8),
+            table:has(#detailTableBody) td:nth-child(8) { width: 16%; text-align: right !important; } 
+            table:has(#detailTableBody) th:nth-child(9),
+            table:has(#detailTableBody) td:nth-child(9) { width: 10%; text-align: center !important; } 
+          }
+        </style>
+
+        <div class="card" style="padding:20px;">
+          <div style="text-align:center;margin-bottom:18px;">
+            <h2 style="color:var(--pri);font-weight:800;font-size:22px;letter-spacing:1px;">
+              📦 DANH SÁCH SẢN PHẨM
+            </h2>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+            <div style="position:relative;flex:1;min-width:200px;">
+              <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);"></i>
+              <input type="text" id="prodSearchInp" class="finput" style="padding-left:32px;" placeholder="🔍 Tìm tên sản phẩm..." oninput="filterProductList()">
+            </div>
+            
+            <button type="button" class="btn-3d-excel" onclick="downloadProductsExcel()">
+              <i class="fas fa-file-excel" style="font-size: 14px;"></i> TẢI FILE EXCEL
+            </button>
+          </div>
+
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead>
+                <tr style="background:#f9fafb;">
+                  <th style="padding:10px 8px;border-bottom:2px solid var(--bdr);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;width:40px;">#</th>         
+                  <th style="padding:10px 8px;border-bottom:2px solid var(--bdr);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;">TÊN SẢN PHẨM</th>
+                  <th style="padding:10px 8px;border-bottom:2px solid var(--bdr);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;text-align:right;white-space:nowrap;">ĐƠN GIÁ</th>
+                  <th style="padding:10px 8px;border-bottom:2px solid var(--bdr);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;text-align:center;">TỒN KHO</th>
+                  <th style="padding:10px 8px;border-bottom:2px solid var(--bdr);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;text-align:center;">THAO TÁC</th>
+                </tr>
+              </thead>
+              <tbody id="prodListTbody">
+                <tr><td colspan="5" style="padding:20px;text-align:center;color:var(--muted);">
+                  <i class="fas fa-spinner fa-spin me-2"></i>Đang tải...
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="modal fade" id="editProdModal" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered" style="max-width:380px">
+            <div class="modal-content" style="border-radius:14px;border:none;">
+              <div class="modal-header" style="background:var(--pri);color:#fff;border-radius:14px 14px 0 0;padding:14px 18px;">
+                <h6 class="modal-title" style="font-weight:700;margin:0;">✏️ Sửa Sản Phẩm</h6>
+                <button type="button" data-bs-dismiss="modal" style="background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer;">×</button>
+              </div>
+              <div class="modal-body" style="padding:18px;">
+                <input type="hidden" id="editProdOldMaSP">
+                <div style="margin-bottom:12px;">
+                  <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Mã Sản Phẩm</label>
+                  <input type="text" id="editProdMaSP" class="finput" placeholder="Mã SP...">
+                </div>
+                <div style="margin-bottom:12px;">
+                  <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Tên Sản Phẩm</label>
+                  <input type="text" id="editProdName" class="finput" placeholder="Tên sản phẩm...">
+                </div>
+                <div style="margin-bottom:12px;">
+                  <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Đơn Giá</label>
+                  <input type="number" id="editProdPrice" class="finput" placeholder="0">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Tồn Kho</label>
+                  <input type="number" id="editProdStock" class="finput" placeholder="0">
+                </div>
+              </div>
+              <div class="modal-footer" style="padding:12px 18px;border-top:1px solid var(--bdr);">
+                <button type="button" class="btn2 btn-out" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn2 btn-pri" onclick="saveEditProduct()">
+                  <i class="fas fa-save me-1"></i>Lưu
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== ADMIN ========== -->
+      <div id="pAdmin" class="page">
+        <div class="admin-grid">
+          <div class="atile" style="background:var(--pri-lt)" onclick="showPage('customers');closeAllAdminDropdowns()"><div class="atile-icon">👥</div><div class="atile-lbl" style="color:var(--pri)">Khách hàng</div></div>
+          <div class="atile" style="background:#fef3c7" onclick="showPage('products');closeAllAdminDropdowns()"><div class="atile-icon">🏷️</div><div class="atile-lbl" style="color:var(--warn)">Sản phẩm</div></div>
+        </div>
+
+        <div class="card" style="border-top:3px solid var(--info)">
+          <div class="sec-head"><i class="fas fa-cogs me-2" style="color:var(--info)"></i>Cài đặt hệ thống</div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-weight:700; font-size:13px; color:var(--txt)">Kiểm soát Tồn kho nghiêm ngặt</div>
+              <div style="font-size:11px; color:var(--muted)">
+                Nếu BẬT: Sale không thể bán vượt quá tồn kho hiện tại.<br>
+                Nếu TẮT: Sale được phép bán âm kho (vượt tồn kho).
+              </div>
+            </div>
+            
+            <div class="form-check form-switch" style="margin:0; padding-left:2.5em;">
+              <input class="form-check-input" type="checkbox" id="strictStockToggle" style="width:40px; height:20px; cursor:pointer;" onchange="toggleStrictStock(this)">
+            </div>
+          </div>
+        </div>
+        <div class="card" style="border-top:3px solid #dc2626">
+  <div class="sec-head"><i class="fas fa-ban me-2" style="color:#dc2626"></i>Loại trừ gộp đơn</div>
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+    <div>
+      <div style="font-weight:700; font-size:13px; color:var(--txt)">Hàng loại trừ không gộp vào toa Chờ in</div>
+      <div style="font-size:11px; color:var(--muted)">
+        Nếu BẬT: sản phẩm trong danh sách sẽ luôn tạo thành toa riêng.<br>
+        Nếu TẮT: gộp đơn như bình thường.
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
+      <button id="btnExcludeList" class="btn2 btn-out" disabled onclick="openExcludeModal()" style="opacity:.5">
+        <i class="fas fa-list"></i> Danh Sách
+      </button>
+      <div class="form-check form-switch" style="margin:0; padding-left:2.5em;">
+        <input class="form-check-input" type="checkbox" id="excludeMergeToggle" style="width:40px; height:20px; cursor:pointer;" onchange="toggleExcludeMerge(this)">
+      </div>
+    </div>
+  </div>
+</div>
+                 <!-- ========== CARD CÀI ĐẶT HÓA ĐƠN ========== -->
+        <div class="card" style="border-top:3px solid #7c3aed">
+          <div class="sec-head"><i class="fas fa-file-invoice me-2" style="color:#7c3aed"></i>Cài đặt giao diện Hóa Đơn</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-weight:700;font-size:13px;color:var(--txt)">Tùy chỉnh in ấn hóa đơn</div>
+              <div style="font-size:11px;color:var(--muted)">Chỉnh cỡ chữ, màu sắc, lề, tiêu đề cột... sẽ áp dụng ngay khi in.</div>
+            </div>
+            <button class="btn2" style="background:#7c3aed;color:#fff;border-color:#7c3aed;flex-shrink:0;margin-left:10px" onclick="openInvoiceSettingsModal()">
+              <i class="fas fa-sliders-h"></i> Chỉnh sửa
+            </button>
+          </div>
+        </div>
+                <div class="card" style="border-top:3px solid var(--warn)">
+          <div class="sec-head">
+            <i class="fas fa-bolt me-2" style="color:var(--warn)"></i>Thêm Nhanh Sản Phẩm Mới
+          </div>
+          <div style="background:var(--warn-lt);border:1px solid #fbbf24;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#92400e;display:flex;align-items:flex-start;gap:8px;">
+            <i class="fas fa-info-circle" style="margin-top:1px;flex-shrink:0;"></i>
+            <div>
+              <strong>Mã SP</strong> sẽ tự động tăng từ mã cuối trong danh mục. Bạn có thể tự nhập mã riêng hoặc <em>để trống</em> để hệ thống tự tạo.
+            </div>
+          </div>
+
+          <div id="quickProdFields"></div>
+          <button id="btnSaveQuickProd" onclick="saveQuickProducts()" style="width:100%;padding:11px;margin-top:8px;background:var(--warn);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <i class="fas fa-save"></i> Lưu Danh Sách Sản Phẩm
+          </button>
+        </div>
+        <div class="card" style="border-top:3px solid var(--pri)">
+          <div class="sec-head"><i class="fas fa-user-plus me-2 text-primary"></i>Thêm nhân viên mới</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <input id="adName" class="finput" placeholder="Họ tên" style="padding:8px 10px">
+            <input id="adID" class="finput" placeholder="ID (Username)" style="padding:8px 10px">
+            <input id="adPass" class="finput" type="password" placeholder="Mật khẩu" style="padding:8px 10px">
+            <input id="adPhone" class="finput" placeholder="Số điện thoại" style="padding:8px 10px">
+          </div>
+          <select id="adRole" class="finput fselect" style="margin-bottom:10px;padding:8px 28px 8px 10px">
+            <option value="Sale">Sale</option>
+            <option value="Leader">Leader</option>
+          </select>
+          <button class="btn2 btn-pri btn-full" onclick="addStaff()">Lưu nhân viên</button>
+        </div>
+        <div class="card">
+          <div class="sec-head"><i class="fas fa-clipboard-list me-2 text-muted"></i>Danh sách nhân viên</div>
+          <div id="staffListTable"></div>
+        </div>
+        </div>
+
+    </div>
+  </div>
+</div>
+ <div class="xl-modal" id="invoiceSettingsModal" style="display:none;z-index:9999;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
+  <div class="xl-box" style="background:#fff;overflow:hidden;box-shadow:0 10px 15px rgba(0,0,0,0.2)">
+    
+    <div class="xl-head" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);flex-shrink:0;padding:12px 16px;color:#fff;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-weight:bold"><i class="fas fa-file-invoice" style="margin-right:8px"></i>Cài Đặt Giao Diện & Xem Trước</span>
+      <button class="xl-close" onclick="closeInvoiceSettingsModal()" style="background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1">×</button>
+    </div>
+    
+    <div class="is-container">
+      <div class="is-left">
+        <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:10px;border: 1px solid #e5e7eb;">
+          <div style="font-size:11px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px"><i class="fas fa-image me-1"></i>Logo Công Ty</div>
+          <div style="margin-bottom: 8px;">
+            <label style="font-size:11px;color:var(--muted);font-weight:600">Link Ảnh Logo (URL)</label>
+            <input type="text" id="is_logoUrl" class="finput" style="width:100%;padding:6px 8px;margin-top:3px" placeholder="Dán link ảnh...">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Chiều rộng (px)</label>
+              <input type="number" id="is_logoW" value="160" class="finput" style="width:100%;padding:6px 8px;margin-top:3px">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Chiều cao - Ép dẹp (px)</label>
+              <input type="number" id="is_logoH" value="60" class="finput" style="width:100%;padding:6px 8px;margin-top:3px">
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px"><i class="fas fa-building me-1"></i>Thông Tin Công Ty (Góc Trái)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Cỡ chữ Tên Cty (px)</label>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <input type="range" id="is_comNameSize" min="10" max="24" value="13" class="form-range" oninput="document.getElementById('is_comNameSizeV').textContent=this.value">
+                <span id="is_comNameSizeV" style="font-size:12px;font-weight:700;color:var(--pri);min-width:24px">13</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Cỡ chữ Địa chỉ (px)</label>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <input type="range" id="is_comAddrSize" min="8" max="16" value="10" class="form-range" oninput="document.getElementById('is_comAddrSizeV').textContent=this.value">
+                <span id="is_comAddrSizeV" style="font-size:12px;font-weight:700;color:var(--pri);min-width:24px">10</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px"><i class="fas fa-hashtag me-1"></i>Số Hóa Đơn (Góc Phải)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Cỡ chữ (px)</label>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <input type="range" id="is_shdSize" min="8" max="24" value="11" class="form-range" oninput="document.getElementById('is_shdSizeV').textContent=this.value">
+                <span id="is_shdSizeV" style="font-size:12px;font-weight:700;color:var(--pri);min-width:24px">11</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Căn lên / xuống (px)</label>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <input type="range" id="is_shdMt" min="-30" max="50" value="0" class="form-range" oninput="document.getElementById('is_shdMtV').textContent=this.value">
+                <span id="is_shdMtV" style="font-size:12px;font-weight:700;color:var(--pri);min-width:24px">0</span>
+              </div>
+            </div>
+            <div style="grid-column: span 2;">
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Căn lề chữ</label>
+              <select id="is_shdAlign" class="finput" style="width:100%;padding:6px 8px;margin-top:3px;border-radius:6px;border:1px solid var(--bdr);outline:none;">
+                <option value="left">Căn Trái</option>
+                <option value="center">Căn Giữa</option>
+                <option value="right" selected>Căn Phải</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px"><i class="fas fa-heading me-1"></i>Tiêu Đề "HÓA ĐƠN BÁN HÀNG"</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Cỡ chữ (px)</label>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <input type="range" id="is_titleSize" min="14" max="28" value="20" class="form-range" oninput="document.getElementById('is_titleSizeV').textContent=this.value">
+                <span id="is_titleSizeV" style="font-size:12px;font-weight:700;color:var(--pri);min-width:24px">20</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Màu chữ</label>
+              <input type="color" id="is_titleColor" value="#000000" style="width:100%;height:32px;margin-top:3px;border:1px solid var(--bdr);border-radius:6px;cursor:pointer">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Khoảng cách trên (px)</label>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <input type="range" id="is_titleMt" min="-20" max="30" value="5" class="form-range" oninput="document.getElementById('is_titleMtV').textContent=this.value">
+                <span id="is_titleMtV" style="font-size:12px;font-weight:700;color:var(--pri);min-width:24px">5</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Khoảng cách dưới (px)</label>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <input type="range" id="is_titleMb" min="0" max="24" value="10" class="form-range" oninput="document.getElementById('is_titleMbV').textContent=this.value">
+                <span id="is_titleMbV" style="font-size:12px;font-weight:700;color:var(--pri);min-width:24px">10</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px"><i class="fas fa-user me-1"></i>Tên Khách Hàng</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Cỡ chữ (px)</label>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <input type="range" id="is_custNameSize" min="12" max="32" value="20" class="form-range" oninput="document.getElementById('is_custNameSizeV').textContent=this.value">
+                <span id="is_custNameSizeV" style="font-size:12px;font-weight:700;color:var(--pri);min-width:24px">20</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Màu chữ</label>
+              <input type="color" id="is_custNameColor" value="#000000" style="width:100%;height:32px;margin-top:3px;border:1px solid var(--bdr);border-radius:6px;cursor:pointer">
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px"><i class="fas fa-address-card me-1"></i>Vùng Thông Tin Khách Hàng</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Cỡ chữ chung (px)</label>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <input type="range" id="is_custInfoSize" min="9" max="15" value="13" class="form-range" oninput="document.getElementById('is_custInfoSizeV').textContent=this.value">
+                <span id="is_custInfoSizeV" style="font-size:12px;font-weight:700;color:var(--pri);min-width:24px">13</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Khoảng cách dưới (px)</label>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <input type="range" id="is_custInfoMb" min="2" max="16" value="8" class="form-range" oninput="document.getElementById('is_custInfoMbV').textContent=this.value">
+                <span id="is_custInfoMbV" style="font-size:12px;font-weight:700;color:var(--pri);min-width:24px">8</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px"><i class="fas fa-phone me-1"></i>Số ĐT Công Ty</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Cỡ chữ (px)</label>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <input type="range" id="is_phoneSize" min="8" max="18" value="12" class="form-range" oninput="document.getElementById('is_phoneSizeV').textContent=this.value">
+                <span id="is_phoneSizeV" style="font-size:12px;font-weight:700;color:var(--pri);min-width:24px">12</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Khoảng cách trên (px)</label>
+              <input type="number" id="is_phoneMt" value="4" min="0" max="20" class="finput" style="width:100%;padding:6px 8px;margin-top:3px">
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px"><i class="fas fa-table me-1"></i>Bảng Sản Phẩm</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Cỡ chữ tiêu đề (px)</label>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <input type="range" id="is_thSize" min="9" max="16" value="12" class="form-range" oninput="document.getElementById('is_thSizeV').textContent=this.value">
+                <span id="is_thSizeV" style="font-size:12px;font-weight:700;color:var(--pri);min-width:24px">12</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Cỡ chữ ND (px)</label>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <input type="range" id="is_tdSize" min="9" max="16" value="12" class="form-range" oninput="document.getElementById('is_tdSizeV').textContent=this.value">
+                <span id="is_tdSizeV" style="font-size:12px;font-weight:700;color:var(--pri);min-width:24px">12</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Màu nền T.Đề</label>
+              <input type="color" id="is_thBg" value="#ffffff" style="width:100%;height:32px;margin-top:3px;border:1px solid var(--bdr);border-radius:6px;cursor:pointer">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Màu chữ T.Đề</label>
+              <input type="color" id="is_thColor" value="#000000" style="width:100%;height:32px;margin-top:3px;border:1px solid var(--bdr);border-radius:6px;cursor:pointer">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Padding ô (px)</label>
+              <input type="number" id="is_tdPad" value="5" min="2" max="14" class="finput" style="width:100%;padding:6px 8px;margin-top:3px">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Màu viền bảng</label>
+              <input type="color" id="is_borderColor" value="#000000" style="width:100%;height:32px;margin-top:3px;border:1px solid var(--bdr);border-radius:6px;cursor:pointer">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Độ dày viền (px)</label>
+              <input type="number" id="is_borderW" value="1" min="1" max="4" class="finput" style="width:100%;padding:6px 8px;margin-top:3px">
+            </div>
+          </div>
+          <div style="margin-top:10px;border-top:1px dashed var(--bdr);padding-top:10px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <input id="is_th0" class="finput" placeholder="STT" style="width:100%;padding:6px 8px">
+              <input id="is_th1" class="finput" placeholder="TÊN HÀNG" style="width:100%;padding:6px 8px">
+              <input id="is_th2" class="finput" placeholder="SL" style="width:100%;padding:6px 8px">
+              <input id="is_th3" class="finput" placeholder="ĐƠN GIÁ" style="width:100%;padding:6px 8px">
+              <input id="is_th4" class="finput" placeholder="CK" style="width:100%;padding:6px 8px">
+              <input id="is_th5" class="finput" placeholder="ĐƠN GIÁ CK" style="width:100%;padding:6px 8px">
+              <input id="is_th6" class="finput" placeholder="THÀNH TIỀN" style="width:100%;padding:6px 8px">
+              <input id="is_th7" class="finput" placeholder="GHI CHÚ" style="width:100%;padding:6px 8px">
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px"><i class="fas fa-calculator me-1"></i>Vùng Tổng Tiền & Nợ Cũ</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Cỡ "TỔNG T.TOÁN" (px)</label>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <input type="range" id="is_ttSize" min="10" max="20" value="14" class="form-range" oninput="document.getElementById('is_ttSizeV').textContent=this.value">
+                <span id="is_ttSizeV" style="font-size:12px;font-weight:700;color:var(--pri);min-width:24px">14</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Cỡ "TỔNG CỘNG" (px)</label>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <input type="range" id="is_tcSize" min="10" max="22" value="15" class="form-range" oninput="document.getElementById('is_tcSizeV').textContent=this.value">
+                <span id="is_tcSizeV" style="font-size:12px;font-weight:700;color:var(--pri);min-width:24px">15</span>
+              </div>
+            </div>
+            <div style="grid-column: span 2;">
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Cỡ "NỢ CŨ / CÒN LẠI" (px)</label>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <input type="range" id="is_ncSize" min="10" max="20" value="13" class="form-range" oninput="document.getElementById('is_ncSizeV').textContent=this.value">
+                <span id="is_ncSizeV" style="font-size:12px;font-weight:700;color:var(--pri);min-width:24px">13</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px"><i class="fas fa-ruler-combined me-1"></i>Lề Hóa Đơn (mm)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Lề Trái / Phải (mm)</label>
+              <input type="number" id="is_padLR" value="15" min="2" max="30" class="finput" style="width:100%;padding:6px 8px;margin-top:3px">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);font-weight:600">Lề Trên / Dưới (mm)</label>
+              <input type="number" id="is_padTB" value="12" min="2" max="30" class="finput" style="width:100%;padding:6px 8px;margin-top:3px">
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="is-right">
+        <div style="color:#fff; font-size:14px; font-weight:bold; margin-bottom:12px; text-align:center; letter-spacing:1px;"><i class="fas fa-desktop me-2"></i>XEM TRƯỚC HÓA ĐƠN</div>
+        <iframe id="invoicePreviewFrame" style="flex:1; width:100%; border:none; background:#fff; border-radius:6px; box-shadow:0 4px 15px rgba(0,0,0,0.3);"></iframe>
+      </div>
+    </div>
+    
+    <div class="xl-foot" style="flex-shrink:0;display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--bdr); background: white;">
+      <button class="btn2 btn-out" style="flex:1; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px;" onclick="resetInvoiceSettings()"><i class="fas fa-undo me-1"></i>Đặt lại mặc định</button>
+      <button class="btn2" style="flex:2;background:#7c3aed;color:#fff;border:none; border-radius: 6px; padding: 8px;" onclick="saveInvoiceSettings()"><i class="fas fa-save me-1"></i>Lưu & Áp Dụng</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== MODAL CHI TIẾT ĐƠN HÀNG ========== -->
+<div class="modal fade" id="orderDetailModal" tabindex="-1" aria-hidden="true">
+<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+    <div class="modal-content" style="border-radius:var(--rad-lg);border:none;overflow:hidden">
+      <div class="modal-header" style="background:var(--pri);color:#fff;border:none">
+        <h5 class="modal-title fw-bold" id="modalTitle">Chi tiết đơn hàng</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="modalDynContent"></div>
+        <div id="orderHeaderDisplay">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+            <div style="background:var(--bg);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Mã đơn</div><div style="font-weight:600;font-size:14px;color:var(--pri)" id="detailId"></div></div>
+            <div style="background:var(--bg);border-radius:8px;padding:9px"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Ngày hoàn thành</div><div style="font-weight:600" id="detailTime"></div></div>
+          </div>
+          <div style="background:var(--pri-lt);border-radius:8px;padding:10px;margin-bottom:12px">
+            <div style="font-weight:600;color:var(--pri);font-size:14px" id="detailCust"></div>
+            <div style="font-size:10px;color:var(--muted);margin-top:3px" id="detailAddr"></div>
+          </div>
+        </div>
+        <table class="dtbl" id="orderTable">
+  <thead>
+    <tr>
+      <th width="4%">#</th>
+      <th width="20%">Sản phẩm</th> <th width="7%" style="text-align:center">SL</th>
+      <th width="12%" style="text-align:right">Giá</th>
+      <th width="7%" style="text-align:center">CK%</th>
+      <th width="14%" style="text-align:right; color:var(--info);">Giá sau CK</th>
+      <th width="14%" style="text-align:right">T.Tiền</th>
+      <th width="22%">Ghi chú</th> </tr>
+  </thead>
+  <tbody id="detailTableBody"></tbody>
+</table>
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-end; margin-top:12px; padding-top:12px; border-top:1.5px dashed var(--bdr); gap:10px;">
+          <div style="text-align:left; flex:1; min-width:15%; display:none;" id="detailDebtContainer">
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:2px">Công nợ cũ</div>
+            <div style="font-size:14px;font-weight:700;color:var(--warn)" id="detailDebt">0 VNĐ</div>
+          </div>
+          <div style="text-align:right; flex:1; min-width:20%;">
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:2px" id="totalTextLabel">Tổng cộng</div>
+            <div style="font-size:18px;font-weight:700;color:var(--dan)" id="detailTotal"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--bdr)" id="detailFooter"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== MODAL DANH SÁCH LOẠI TRỪ ========== -->
+<div class="xl-modal" id="excludeModal">
+  <div class="xl-box" style="max-width:560px">
+    <div class="xl-head" style="background:#dc2626">
+      <span><i class="fas fa-ban me-2"></i>Danh sách hàng loại trừ gộp đơn</span>
+      <button class="xl-close" onclick="closeExcludeModal()">×</button>
+    </div>
+    <div class="xl-body">
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <input type="text" id="excludeInp" class="finput" list="excludeProdDl" placeholder="🔍 Nhập tên sản phẩm loại trừ..." autocomplete="off"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();addExcludeItem();}">
+        <datalist id="excludeProdDl"></datalist>
+        <button class="btn2 btn-dng" style="white-space:nowrap" onclick="addExcludeItem()"><i class="fas fa-plus"></i> Thêm</button>
+      </div>
+      <div id="excludeListWrap" style="max-height:50vh; overflow-y:auto;"></div>
+    </div>
+    <div class="xl-foot">
+      <button class="btn2 btn-out" onclick="closeExcludeModal()">Đóng</button>
+    </div>
+  </div>
+</div>
+<!-- ========== MODAL XỬ LÝ ĐƠN ========== -->
+<div class="xl-modal" id="xlModal">
+  <div class="xl-box">
+    <div class="xl-head">
+      <span id="xlModalTitle">⚙️ Xử lý đơn hàng</span>
+      <button class="xl-close" onclick="closeXlModal()">×</button>
+    </div>
+    <div class="xl-body" id="xlModalBody"></div>
+    <div class="xl-foot" id="xlModalFoot"></div>
+  </div>
+</div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Thư viện định dạng số AutoNumeric -->
+<script src="https://cdn.jsdelivr.net/npm/autonumeric@4.6.0/dist/autoNumeric.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<!-- ChatBot Ngu Ngu -->
+<style>
+  .chat-fab { position:fixed; bottom:20px; right:20px; width:50px; height:50px; background:var(--pri); color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.2); z-index:9999; transition:0.3s;}
+  .chat-fab:hover { transform:scale(1.1); }
+  .chat-window { position:fixed; bottom:80px; right:20px; width:340px; max-width:90vw; height:450px; max-height:80vh; background:#fff; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,0.2); z-index:9998; display:none; flex-direction:column; overflow:hidden; border:1px solid var(--bdr);}
+  .chat-window.show { display:flex; }
+  .chat-header { background:var(--pri); color:#fff; padding:12px 16px; font-weight:700; display:flex; justify-content:space-between; align-items:center; font-size:14px; }
+  .chat-close { background:none; border:none; color:#fff; font-size:20px; cursor:pointer; line-height:1; }
+  .chat-body { flex:1; padding:12px; overflow-y:auto; background:#f5f7fa; display:flex; flex-direction:column; gap:8px; font-size:13px; scroll-behavior: smooth;}
+  .chat-msg { max-width:85%; padding:8px 12px; border-radius:12px; line-height:1.4; word-break:break-word; }
+  .chat-msg.bot { background:#fff; color:var(--txt); border:1px solid var(--bdr); align-self:flex-start; border-bottom-left-radius:4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);}
+  .chat-msg.user { background:var(--pri-lt); color:var(--pri-dk); align-self:flex-end; border-bottom-right-radius:4px; }
+  .chat-footer { padding:10px; background:#fff; border-top:1px solid var(--bdr); display:flex; gap:6px; position:relative; }
+  .chat-input { flex:1; padding:8px 12px; border:1px solid var(--bdr); border-radius:20px; outline:none; font-size:13px; }
+  .chat-input:focus { border-color:var(--pri); }
+  .chat-send { background:var(--pri); color:#fff; border:none; border-radius:50%; width:34px; height:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .chat-btn { display:inline-block; background:#fff; border:1px solid var(--pri); color:var(--pri); padding:6px 12px; border-radius:14px; font-size:11.5px; margin-top:6px; cursor:pointer; font-weight:600; margin-right:4px;}
+  .chat-btn:hover { background:var(--pri-lt); }
+  .chat-btn.menu { border-color:#065f46; color:#065f46; } /* Màu riêng cho nút Menu chính */
+  .chat-btn.menu:hover { background:#e8f5f0; }
+</style>
+
+<div class="chat-fab" onclick="toggleChat()">💬</div>
+<div class="chat-window" id="chatWindow">
+  <div class="chat-header">
+    <span><i class="fa-brands fa-android" style="color:#3DDC84;"></i> Ánh Dương Bot</span>
+    <button class="chat-close" onclick="toggleChat()">×</button>
+  </div>
+  <div class="chat-body" id="chatBody">
+    </div>
+  <div class="chat-footer">
+    <div id="chatSuggestBox" style="display:none; position:absolute; bottom:100%; left:0; width:100%; background:#fff; border:1px solid var(--bdr); border-radius:12px 12px 0 0; max-height:200px; overflow-y:auto; box-shadow:0 -4px 15px rgba(0,0,0,0.1); z-index:100;"></div>
+    
+    <input type="text" id="chatInput" class="chat-input" placeholder="Gõ câu hỏi hoặc lệnh..." 
+           oninput="handleChatSuggest(this.value)" 
+           onkeypress="if(event.key==='Enter') sendChat()">
+    <button class="chat-send" onclick="sendChat()"><i class="fas fa-paper-plane"></i></button>
+  </div>
+</div>
+<!-- AUTO LOGIN TỪ URL PARAM + CẦU NỐI GAS -->
+<script src="js/gas-bridge.js"></script>
+<script>
+  const _urlP = new URLSearchParams(window.location.search);
+  const AUTO_U = _urlP.get('u') || '';
+  const AUTO_P = _urlP.get('p') || '';
+</script>
+<script src="js/Scripts.js"></script>
+<script src="js/Print_PhieuXuat.js"></script>
+<script src="js/Print_BaoCao.js"></script>
+<script src="js/Scripts2.js"></script>
+<script src="js/Scripts3.js"></script>
+<script src="js/Scripts4.js"></script>
+<script src="js/Scripts5.js"></script>
+<script src="js/Scripts6.js"></script>
+<script>
+  loadHtmlModules([
+    'modules/Tracuu.html',
+    'modules/Thekho.html',
+    'modules/ThongBao.html',
+    'modules/Mascot.html'
+  ]);
+</script>
 </body>
 </html>
