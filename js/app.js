@@ -186,7 +186,31 @@ async function syncAllData(loadAllHistory = false) {
       callApi("loadInvoiceConfig").catch(() => null)
     ]);
 
-    if (base) APP_STATE.data = Object.assign({}, APP_STATE.data, base);
+    if (base) {
+  APP_STATE.data = {
+    customers: (base.customers || []).map(c => ({
+      name: c.name || c.Ten_Khach || c.Ten_KH || "",
+      phone: c.phone || c.SDT || "",
+      address: c.address || c.Dia_Chi || "",
+      debt: Number(c.debt ?? c.Cong_No ?? 0)
+    })),
+    products: (base.products || []).map((p, i) => ({
+      code: p.code || p.Ma_SP || p.MSP || ("SP" + (i + 1)),
+      name: p.name || p.Ten_San_Pham || p.Ten_SP || "",
+      price: Number(p.price ?? p.Don_Gia ?? 0),
+      stock: Number(p.stock ?? p.Ton_Kho ?? p.So_Luong ?? 0),
+      category: p.category || p.Nhom || "Khác"
+    })),
+    staffs: (base.staffs || []).map(s => ({
+      username: s.username || s.id || "",
+      fullName: s.fullName || s.name || "",
+      role: s.role || "Sale",
+      phone: s.phone || ""
+    })),
+    strictStock: Boolean(base.strictStock),
+    excludeMerge: base.excludeMerge || []
+  };
+}
     if (hist) APP_STATE.histories = hist;
     if (Array.isArray(drafts)) APP_STATE.draftsCount = drafts.length;
     if (invCfg) APP_STATE.invoiceConfig = Object.assign({}, DEFAULT_INVOICE_CONFIG, invCfg);
