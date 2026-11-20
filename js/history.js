@@ -4,9 +4,16 @@ const HIST_UI = {
   fromDate: "",
   toDate: "",
   statusFilter: "all",
-  scopeFilter: "all", // "all" | "mine"
+  scopeFilter: "all",
+
+  // State riêng cho Xử Lý Đơn Hàng
+  procTab: "all", // "all" | "pending" | "completed" | "cancelled"
+  procExactDate: "",
+  procInvoiceCode: "",
   procSearch: "",
-  procFilter: "all"
+  procDateFilter: "all",
+  procFromDate: "",
+  procToDate: ""
 };
 
 function renderHistoryAndProcessTab(container, tab) {
@@ -27,11 +34,21 @@ function getDateFilterLabel(key) {
   return map[key] || "Tất cả";
 }
 
+function matchExactDate(dateStr, yyyyMmDd) {
+  if (!yyyyMmDd) return true;
+  if (!dateStr) return false;
+  const parts = yyyyMmDd.split("-"); // [yyyy, mm, dd]
+  const ddMmYyyy = `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return String(dateStr).includes(ddMmYyyy) || String(dateStr).includes(yyyyMmDd);
+}
+
+// ==========================================
+// 1. QUẢN LÝ ĐƠN HÀNG (LỊCH SỬ LÊN ĐƠN)
+// ==========================================
 function renderOrderManagementView(container) {
   const currentUserName = APP_STATE.user?.fullName || "";
   const q = bodau(HIST_UI.search);
 
-  // Lọc theo phạm vi (Tất cả / Cá nhân), thời gian và từ khóa tìm kiếm trước để tính số liệu 4 hộp thống kê
   const baseRows = (APP_STATE.histories.hoaDon || []).filter(h => {
     if (HIST_UI.scopeFilter === "mine" && h.saleName !== currentUserName) return false;
     if (!isDateInRange(h.date, HIST_UI.dateFilter, HIST_UI.fromDate, HIST_UI.toDate)) return false;
@@ -44,7 +61,6 @@ function renderOrderManagementView(container) {
   const waitingPrintCount = baseRows.filter(h => h.status !== "Đã in").length;
   const printedCount = baseRows.filter(h => h.status === "Đã in").length;
 
-  // Lọc tiếp theo trạng thái khi bấm vào các hộp thống kê
   const rows = baseRows.filter(h => {
     if (HIST_UI.statusFilter === "Chờ in") return h.status !== "Đã in";
     if (HIST_UI.statusFilter === "Đã in") return h.status === "Đã in";
@@ -66,7 +82,7 @@ function renderOrderManagementView(container) {
     </div>
 
     <div class="grid-2" style="margin-bottom:12px">
-      <div class="stat-card" id="stat-rev" style="cursor:default">
+      <div class="stat-card" style="cursor:default">
         <div class="muted" style="font-size:12px;font-weight:700">DOANH THU</div>
         <div class="stat-val" style="color:var(--blue);font-size:20px">${formatMoney(totalRevenue)}đ</div>
         <div class="muted" style="font-size:12px">${getDateFilterLabel(HIST_UI.dateFilter)}</div>
@@ -153,10 +169,7 @@ function renderOrderManagementView(container) {
   document.getElementById("stat-printed").onclick = () => { HIST_UI.statusFilter = "Đã in"; renderOrderManagementView(container); };
 
   document.querySelectorAll('input[name="hist-scope"]').forEach(r => {
-    r.onchange = (e) => {
-      HIST_UI.scopeFilter = e.target.value;
-      renderOrderManagementView(container);
-    };
+    r.onchange = (e) => { HIST_UI.scopeFilter = e.target.value; renderOrderManagementView(container); };
   });
 
   document.getElementById("hist-search").oninput = (e) => {
@@ -167,10 +180,7 @@ function renderOrderManagementView(container) {
   };
 
   document.querySelectorAll(".hist-date-btn").forEach(btn => {
-    btn.onclick = () => {
-      HIST_UI.dateFilter = btn.getAttribute("data-date");
-      renderOrderManagementView(container);
-    };
+    btn.onclick = () => { HIST_UI.dateFilter = btn.getAttribute("data-date"); renderOrderManagementView(container); };
   });
 
   document.getElementById("btn-load-all-hist").onclick = () => {
@@ -214,123 +224,405 @@ function renderOrderManagementView(container) {
   });
 }
 
+// ==========================================
+// 2. XỬ LÝ ĐƠN HÀNG (CHỜ XỬ LÝ / HOÀN THÀNH / HỦY TOA)
+// ==========================================
 function renderProcessOrdersView(container) {
+  // Chỉ lấy đơn trạng thái "Đã in" từ Don_Hang đưa sang "Chờ xử lý"
+  const pendingOrders = (APP_STATE.histories.hoaDon || [])
+    .filter(h => h.status === "Đã in")
+    .map(h => Object.assign({}, h, { _procType: "pending", _label: "Chờ xử lý" }));
+
+  const completedOrders = (APP_STATE.histories.hoanThanh || [])
+    .map(h => Object.assign({}, h, { _procType: "completed", _label: "Hoàn thành" }));
+
+  const cancelledOrders = (APP_STATE.histories.huyToa || [])
+    .map(h => Object.assign({}, h, { _procType: "cancelled", _label: "Hủy Toa" }));
+
+  const totalCompletedRevenue = completedOrders.reduce((s, h) => s + Number(h.totalAmount || h.grandTotal || 0), 0);
+
+  let combined = [];
+  if (HIST_UI.procTab === "pending") combined = pendingOrders;
+  else if (HIST_UI.procTab === "completed") combined = completedOrders;
+  else if (HIST_UI.procTab === "cancelled") combined = cancelledOrders;
+  else combined = [...pendingOrders, ...completedOrders, ...cancelledOrders];
+
   const q = bodau(HIST_UI.procSearch);
-  const list = (APP_STATE.histories.hoaDon || []).filter(h => {
-    if (HIST_UI.procFilter === "printed" && h.status !== "Đã in") return false;
-    if (HIST_UI.procFilter === "unprinted" && h.status === "Đã in") return false;
+  const list = combined.filter(o => {
+    if (HIST_UI.procExactDate && !matchExactDate(o.date, HIST_UI.procExactDate)) return false;
+    if (!isDateInRange(o.date, HIST_UI.procDateFilter, HIST_UI.procFromDate, HIST_UI.procToDate)) return false;
     if (!q) return true;
-    return bodau(h.id).includes(q) || bodau(h.customerName).includes(q);
+    return bodau(o.id).includes(q) || bodau(o.customerName).includes(q) || bodau(o.saleName).includes(q);
   });
 
-  container.innerHTML = `<div class="card">
-    <h2 style="margin:0 0 10px;color:var(--blue)">Xử Lý Đơn Hàng (${list.length})</h2>
-    <div class="grid-2" style="margin-bottom:12px">
-      <input id="proc-search" type="text" class="input" value="${HIST_UI.procSearch}" placeholder="Tìm nhanh số HĐ hoặc tên khách..." />
-      <select id="proc-filter" class="input">
-        <option value="all" ${HIST_UI.procFilter === "all" ? "selected" : ""}>Tất cả</option>
-        <option value="printed" ${HIST_UI.procFilter === "printed" ? "selected" : ""}>Đã in (Chờ duyệt)</option>
-        <option value="unprinted" ${HIST_UI.procFilter === "unprinted" ? "selected" : ""}>Chờ in</option>
-      </select>
+  const dateBtns = [
+    { id: "all", label: "Tất cả" },
+    { id: "today", label: "Hôm nay" },
+    { id: "yesterday", label: "Hôm qua" },
+    { id: "7days", label: "7 ngày" },
+    { id: "thisMonth", label: "Tháng này" },
+    { id: "custom", label: "Tùy chọn" }
+  ];
+
+  container.innerHTML = `
+    <div style="margin-bottom:10px">
+      <button type="button" id="btn-proc-back" class="btn btn-outline btn-sm" style="border-radius:999px">← Quay lại</button>
     </div>
 
-    ${list.map((h, idx) => {
-      const cust = APP_STATE.data.customers.find(c => c.name === h.customerName);
-      const oldDebt = Number(cust?.debt || 0);
-      return `<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
-          <div><b>${h.id}</b> — <b>${h.customerName}</b> <span class="badge ${h.status === "Đã in" ? "red" : ""}">${h.status || "Chờ in"}</span></div>
-          <div>Tiền hàng: <b style="color:var(--blue)">${formatMoney(h.totalAmount)} đ</b> | Nợ cũ: <b style="color:var(--red)">${formatMoney(oldDebt)} đ</b></div>
-        </div>
-        <div class="muted" style="margin:4px 0">Ngày: ${h.date} | Sale: ${h.saleName}</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-          <button type="button" class="btn btn-outline btn-sm proc-print-inv" data-i="${idx}">In Hóa Đơn A5</button>
-          <button type="button" class="btn btn-success btn-sm proc-approve" data-i="${idx}">Duyệt Hoàn Thành</button>
-        </div>
-      </div>`;
-    }).join("")}
-  </div>`;
+    <div class="grid-4" style="margin-bottom:12px">
+      <div class="stat-card text-center" id="pstat-pending" style="border-color:${HIST_UI.procTab === "pending" ? "var(--amber)" : "var(--border)"}">
+        <div class="muted" style="font-size:12px;font-weight:700">CHỜ XỬ LÝ</div>
+        <div class="stat-val" style="color:var(--amber)">${pendingOrders.length}</div>
+        <div class="muted" style="font-size:11px">Đơn Đã In</div>
+      </div>
 
-  document.getElementById("proc-search").oninput = (e) => { HIST_UI.procSearch = e.target.value; renderProcessOrdersView(container); };
-  document.getElementById("proc-filter").onchange = (e) => { HIST_UI.procFilter = e.target.value; renderProcessOrdersView(container); };
+      <div class="stat-card text-center" id="pstat-completed" style="border-color:${HIST_UI.procTab === "completed" ? "var(--blue)" : "var(--border)"}">
+        <div class="muted" style="font-size:12px;font-weight:700">HOÀN THÀNH</div>
+        <div class="stat-val" style="color:var(--blue)">${completedOrders.length}</div>
+        <div class="muted" style="font-size:11px">Đã Xử Lý</div>
+      </div>
 
-  document.querySelectorAll(".proc-print-inv").forEach(btn => {
-    btn.onclick = async () => {
-      const h = list[Number(btn.getAttribute("data-i"))];
-      const cust = APP_STATE.data.customers.find(c => c.name === h.customerName);
-      const invObj = Object.assign({}, h, {
-        phone: h.phone || cust?.phone || "",
-        address: h.address || cust?.address || "",
-        oldDebt: Number(cust?.debt || 0),
-        grandTotal: Number(h.totalAmount || 0) + Number(cust?.debt || 0)
-      });
-      printInvoiceA5(invObj, APP_STATE.invoiceConfig, APP_STATE.data.excludeMerge);
-      await callApi("markAsPrinted", [h.id]);
-      syncAllData(false);
-    };
+      <div class="stat-card text-center" id="pstat-cancelled" style="background:${HIST_UI.procTab === "cancelled" ? "#fef2f2" : "#fff"};border-color:${HIST_UI.procTab === "cancelled" ? "var(--red)" : "var(--border)"}">
+        <div class="muted" style="font-size:12px;font-weight:700;color:var(--red)">HỦY TOA</div>
+        <div class="stat-val" style="color:var(--red)">${cancelledOrders.length}</div>
+        <div class="muted" style="font-size:11px;color:var(--red)">đã hủy</div>
+      </div>
+
+      <div class="stat-card text-center" style="cursor:default">
+        <div class="muted" style="font-size:12px;font-weight:700">DOANH THU</div>
+        <div class="stat-val" style="color:var(--green)">${formatMoney(totalCompletedRevenue)}đ</div>
+        <div class="muted" style="font-size:11px">Hoàn Thành</div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      <button type="button" class="btn btn-sm proc-tab-btn ${HIST_UI.procTab === "all" ? "btn-primary" : "btn-outline"}" data-ptab="all">Tất cả</button>
+      <button type="button" class="btn btn-sm proc-tab-btn ${HIST_UI.procTab === "pending" ? "btn-primary" : "btn-outline"}" data-ptab="pending">Chờ xử lý</button>
+      <button type="button" class="btn btn-sm proc-tab-btn ${HIST_UI.procTab === "completed" ? "btn-primary" : "btn-outline"}" data-ptab="completed">Hoàn thành</button>
+      <button type="button" class="btn btn-sm proc-tab-btn ${HIST_UI.procTab === "cancelled" ? "btn-primary" : "btn-outline"}" data-ptab="cancelled">Hủy Toa</button>
+      <input id="proc-exact-date" type="date" class="input" value="${HIST_UI.procExactDate}" style="width:auto;padding:6px 10px" />
+      ${HIST_UI.procExactDate ? `<button type="button" id="proc-clear-date" class="btn btn-outline btn-sm">✕</button>` : ""}
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input id="proc-inv-code" type="text" class="input" value="${HIST_UI.procInvoiceCode}" placeholder="Nhập số HĐ (VD: HD03780)..." style="flex:1" />
+      <button type="button" id="proc-inv-ok" class="btn btn-success" style="padding:0 22px">OK</button>
+    </div>
+
+    <div class="card">
+      <input id="proc-search" type="text" class="input" value="${HIST_UI.procSearch.replace(/"/g, "&quot;")}"
+        placeholder="Tìm nhanh tên khách hàng..." style="margin-bottom:10px" />
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px">
+        <span class="muted" style="font-size:12px;font-weight:700;margin-right:4px">KHOẢNG THỜI GIAN:</span>
+        ${dateBtns.map(b => `
+          <button type="button" class="btn btn-sm proc-date-btn ${HIST_UI.procDateFilter === b.id ? "btn-primary" : "btn-outline"}" data-pdate="${b.id}">
+            ${b.label}
+          </button>
+        `).join("")}
+        <button type="button" id="proc-load-all" class="btn btn-outline btn-sm">👁 Hiện tất cả</button>
+      </div>
+      ${HIST_UI.procDateFilter === "custom" ? `<div class="grid-2" style="margin-top:10px">
+        <div><label class="muted">Từ ngày</label><input id="proc-from" type="date" class="input" value="${HIST_UI.procFromDate}" /></div>
+        <div><label class="muted">Đến ngày</label><input id="proc-to" type="date" class="input" value="${HIST_UI.procToDate}" /></div>
+      </div>` : ""}
+    </div>
+
+    <div id="proc-list">
+      ${list.length === 0 ? `<div class="card text-center muted">Không có đơn hàng nào trong mục này</div>` :
+        list.slice(0, 100).map((o, idx) => {
+          const borderCol = o._procType === "pending" ? "var(--green)" : o._procType === "completed" ? "var(--blue)" : "var(--red)";
+          const firstItem = (o.items || [])[0];
+          const moreCount = Math.max(0, (o.items || []).length - 1);
+          const custObj = APP_STATE.data.customers.find(c => c.name === o.customerName);
+          const addr = o.address || custObj?.address || "";
+
+          return `<div class="card proc-card-open" data-i="${idx}" style="border-left:4px solid ${borderCol};cursor:pointer;padding:12px 14px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+              <div>
+                <div style="font-weight:700;font-size:16px">${o.customerName || "Khách lẻ"}</div>
+                <div class="muted" style="font-size:12px">${o.id || "---"}</div>
+                ${addr ? `<div class="muted" style="font-size:12px;margin-top:2px">📍 ${addr}</div>` : ""}
+              </div>
+              <span class="btn btn-outline btn-sm" style="border-radius:999px;font-size:12px;border-color:${borderCol};color:${borderCol}">
+                ⚙ ${o._label}
+              </span>
+            </div>
+
+            ${firstItem ? `<div style="background:#f8fafc;border-radius:8px;padding:8px 10px;margin:8px 0;font-size:13px;color:#475569">
+              <div>- ${firstItem.name} (x${firstItem.qty})</div>
+              ${moreCount > 0 ? `<div class="muted" style="font-size:12px">... và ${moreCount} sp khác</div>` : ""}
+            </div>` : ""}
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+              <div class="muted" style="font-size:12px">${o.date || ""} | ${o.saleName || "---"}</div>
+              <div style="font-weight:700;font-size:16px;color:var(--red)">${formatMoney(o.grandTotal || o.totalAmount)}đ</div>
+            </div>
+          </div>`;
+        }).join("")}
+    </div>
+  `;
+
+  document.getElementById("btn-proc-back").onclick = () => switchTab("order");
+  document.getElementById("pstat-pending").onclick = () => { HIST_UI.procTab = "pending"; renderProcessOrdersView(container); };
+  document.getElementById("pstat-completed").onclick = () => { HIST_UI.procTab = "completed"; renderProcessOrdersView(container); };
+  document.getElementById("pstat-cancelled").onclick = () => { HIST_UI.procTab = "cancelled"; renderProcessOrdersView(container); };
+
+  document.querySelectorAll(".proc-tab-btn").forEach(btn => {
+    btn.onclick = () => { HIST_UI.procTab = btn.getAttribute("data-ptab"); renderProcessOrdersView(container); };
   });
 
-  document.querySelectorAll(".proc-approve").forEach(btn => {
-    btn.onclick = () => openApproveOrderModal(list[Number(btn.getAttribute("data-i"))]);
+  document.getElementById("proc-exact-date").onchange = (e) => {
+    HIST_UI.procExactDate = e.target.value;
+    renderProcessOrdersView(container);
+  };
+  if (document.getElementById("proc-clear-date")) {
+    document.getElementById("proc-clear-date").onclick = () => {
+      HIST_UI.procExactDate = "";
+      renderProcessOrdersView(container);
+    };
+  }
+
+  const openByCode = () => {
+    const code = bodau(document.getElementById("proc-inv-code").value);
+    if (!code) return;
+    const found = [...pendingOrders, ...completedOrders].find(o => bodau(o.id) === code || bodau(o.id).endsWith(code));
+    if (!found) return Swal.fire("Không tìm thấy", `Không tìm thấy hóa đơn "${code.toUpperCase()}"`, "warning");
+    openApproveOrderModal(found);
+  };
+
+  document.getElementById("proc-inv-ok").onclick = openByCode;
+  document.getElementById("proc-inv-code").onkeydown = (e) => {
+    HIST_UI.procInvoiceCode = e.target.value;
+    if (e.key === "Enter") openByCode();
+  };
+
+  document.getElementById("proc-search").oninput = (e) => {
+    HIST_UI.procSearch = e.target.value;
+    renderProcessOrdersView(container);
+    const inp = document.getElementById("proc-search");
+    if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+  };
+
+  document.querySelectorAll(".proc-date-btn").forEach(btn => {
+    btn.onclick = () => { HIST_UI.procDateFilter = btn.getAttribute("data-pdate"); renderProcessOrdersView(container); };
+  });
+
+  document.getElementById("proc-load-all").onclick = () => {
+    HIST_UI.procDateFilter = "all";
+    HIST_UI.procExactDate = "";
+    syncAllData(true);
+  };
+
+  if (document.getElementById("proc-from")) {
+    document.getElementById("proc-from").onchange = (e) => { HIST_UI.procFromDate = e.target.value; renderProcessOrdersView(container); };
+  }
+  if (document.getElementById("proc-to")) {
+    document.getElementById("proc-to").onchange = (e) => { HIST_UI.procToDate = e.target.value; renderProcessOrdersView(container); };
+  }
+
+  document.querySelectorAll(".proc-card-open").forEach(card => {
+    card.onclick = () => {
+      const ord = list[Number(card.getAttribute("data-i"))];
+      if (ord) openApproveOrderModal(ord);
+    };
   });
 }
 
+// ==========================================
+// 3. POPUP XỬ LÝ ĐƠN (GIỐNG HÌNH 3)
+// ==========================================
 function openApproveOrderModal(order) {
   const cust = APP_STATE.data.customers.find(c => c.name === order.customerName);
-  const defaultDebt = Number(cust?.debt || 0);
-  const items = (order.items || []).map(it => Object.assign({}, it));
+  const addr = order.address || cust?.address || "";
+  const isCompleted = order._procType === "completed";
+
+  const state = {
+    saleName: order.saleName || "",
+    items: (order.items || []).map(it => Object.assign({}, it)),
+    directDiscount: Number(order.directDiscount || 0),
+    oldDebt: Number(order.oldDebt !== undefined && isCompleted ? order.oldDebt : (cust?.debt || 0)),
+    paidAmount: Number(order.paidAmount || 0),
+    addQuery: ""
+  };
 
   const redraw = () => {
-    const sub = items.reduce((s, it) => s + Number(it.price || 0) * (1 - Number(it.ck || 0) / 100) * Number(it.qty || 0), 0);
-    const oldD = Number(document.getElementById("ap-old-debt")?.value ?? defaultDebt) || 0;
-    const paid = Number(document.getElementById("ap-paid")?.value ?? 0) || 0;
-    const disc = Number(document.getElementById("ap-disc")?.value ?? 0) || 0;
-    const grand = sub + oldD - paid - disc;
+    const sub = state.items.reduce((s, it) => {
+      const afterCk = Number(it.price || 0) * (1 - Number(it.ck || 0) / 100);
+      return s + afterCk * Number(it.qty || 0);
+    }, 0);
+    const grand = sub - state.directDiscount + state.oldDebt - state.paidAmount;
+
+    const qAdd = bodau(state.addQuery);
+    const addMatches = !qAdd
+      ? []
+      : APP_STATE.data.products.filter(p => bodau(p.name).includes(qAdd) || bodau(p.code).includes(qAdd)).slice(0, 15);
 
     openModal(`
-      <h3 style="margin-top:0;color:var(--blue)">Duyệt Hoàn Thành Đơn: ${order.id}</h3>
-      <div class="muted">Khách: <b>${order.customerName}</b> | Sale: <b>${order.saleName}</b></div>
-      <div class="table-wrap" style="margin:10px 0">
-        <table><thead><tr><th>Mặt hàng</th><th width="80">SL</th><th width="110">Đơn giá</th><th width="70">CK%</th></tr></thead>
-        <tbody>${items.map((it, i) => `<tr>
-          <td>${it.name}</td>
-          <td><input type="number" step="any" class="input ap-q" data-i="${i}" value="${it.qty}" style="padding:4px" /></td>
-          <td><input type="number" class="input ap-p" data-i="${i}" value="${it.price}" style="padding:4px" /></td>
-          <td><input type="number" class="input ap-c" data-i="${i}" value="${it.ck || 0}" style="padding:4px" /></td>
-        </tr>`).join("")}</tbody></table>
+      <div style="background:var(--blue);color:#fff;padding:12px 16px;margin:-16px -16px 14px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:700;font-size:16px">⚙ Xử lý đơn — ${order.id || "---"}</div>
+        <button type="button" id="ap-close-x" class="icon-btn" style="padding:4px 10px">✕</button>
       </div>
-      <div class="grid-2">
-        <div><label class="muted">Tiền hàng</label><div style="padding:8px;font-weight:700">${formatMoney(sub)} đ</div></div>
-        <div><label class="muted">Nợ cũ</label><input id="ap-old-debt" type="number" class="input ap-calc" value="${oldD}" /></div>
-        <div><label class="muted">Thanh toán / Trả trước</label><input id="ap-paid" type="number" class="input ap-calc" value="${paid}" /></div>
-        <div><label class="muted">Chiết khấu trực tiếp</label><input id="ap-disc" type="number" class="input ap-calc" value="${disc}" /></div>
+
+      <div class="grid-2" style="margin-bottom:10px">
+        <div style="border:1px solid var(--border);border-radius:10px;padding:10px">
+          <div class="muted" style="font-size:11px;font-weight:700">MÃ ĐƠN</div>
+          <div style="font-weight:700;color:var(--blue);font-size:16px">${order.id || "---"}</div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:10px;padding:10px">
+          <div class="muted" style="font-size:11px;font-weight:700">THỜI GIAN</div>
+          <div style="font-weight:700;font-size:15px">${order.date || "---"}</div>
+        </div>
       </div>
-      <div style="margin-top:12px;font-size:18px;font-weight:700;color:var(--blue);text-align:right">Tổng cộng toa: ${formatMoney(grand)} đ</div>
-      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
-        <button type="button" id="ap-cancel" class="btn btn-outline">Hủy</button>
-        <button type="button" id="ap-save" class="btn btn-success">Xác Nhận Hoàn Thành</button>
+
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 12px;margin-bottom:12px">
+        <div style="font-weight:700;color:var(--blue);font-size:15px">${order.customerName || "Khách lẻ"}</div>
+        ${addr ? `<div class="muted" style="font-size:13px;margin:2px 0 6px">📍 ${addr}</div>` : ""}
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+          <span class="muted" style="font-weight:700">NV:</span>
+          <select id="ap-sale-sel" class="input" style="max-width:260px;padding:6px 10px">
+            <option value="">-- Không chọn --</option>
+            ${APP_STATE.data.staffs.map(s => `<option value="${s.fullName}" ${s.fullName === state.saleName ? "selected" : ""}>${s.fullName}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:6px">⊕ THÊM SẢN PHẨM VÀO ĐƠN</div>
+        <input id="ap-add-inp" type="text" class="input" value="${state.addQuery.replace(/"/g, "&quot;")}" placeholder="Nhập tên sản phẩm để thêm..." />
+        ${state.addQuery.trim() ? `<div class="dropdown-list">
+          ${addMatches.length === 0 ? `<div class="dropdown-item muted">Không tìm thấy sản phẩm</div>` :
+            addMatches.map(p => `<div class="dropdown-item ap-add-pick" data-code="${p.code}">
+              <div><b>${p.name}</b> <span class="muted">(${formatMoney(p.price)}đ)</span></div>
+              <span class="stock-pill stock-ok">Kho: ${p.stock}</span>
+            </div>`).join("")}
+        </div>` : ""}
+      </div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px">
+        CHI TIẾT SẢN PHẨM <span style="color:var(--blue)">(CÓ THỂ CHỈNH SỬA)</span>
+      </div>
+
+      <div class="table-wrap" style="margin-bottom:12px">
+        <table>
+          <thead><tr>
+            <th>SẢN PHẨM</th><th width="70">SL</th><th width="105">ĐƠN GIÁ</th><th width="65">CK%</th>
+            <th class="text-right" width="90">SAU CK</th><th class="text-right" width="100">T.TIỀN</th><th width="120">GHI CHÚ</th><th width="40"></th>
+          </tr></thead>
+          <tbody>
+            ${state.items.map((it, i) => {
+              const afterCk = Number(it.price || 0) * (1 - Number(it.ck || 0) / 100);
+              const lineTot = afterCk * Number(it.qty || 0);
+              return `<tr>
+                <td><b>${it.name}</b></td>
+                <td><input type="number" step="any" class="input ap-q" data-i="${i}" value="${it.qty}" style="padding:5px;text-align:center" /></td>
+                <td><input type="number" class="input ap-p" data-i="${i}" value="${it.price}" style="padding:5px;text-align:right;color:var(--red);font-weight:600" /></td>
+                <td><input type="number" class="input ap-c" data-i="${i}" value="${it.ck || 0}" style="padding:5px;text-align:center" /></td>
+                <td class="text-right" style="color:var(--green);font-weight:700">${formatMoney(afterCk)}</td>
+                <td class="text-right" style="color:var(--blue);font-weight:700">${formatMoney(lineTot)}</td>
+                <td><input type="text" class="input ap-n" data-i="${i}" value="${(it.note || "").replace(/"/g, "&quot;")}" placeholder="Ghi chú..." style="padding:5px" /></td>
+                <td><button type="button" class="btn btn-danger btn-sm ap-del-row" data-i="${i}" style="padding:4px 8px">✕</button></td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-weight:700;color:#b45309">🏷 Trừ chiết khấu trực tiếp (VNĐ)</div>
+          <div class="muted" style="font-size:12px">Trừ thẳng vào tổng tiền hàng</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input id="ap-disc" type="number" class="input" value="${state.directDiscount}" style="width:150px;text-align:right;font-weight:700" />
+          <b>đ</b>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:12px">
+        <div><label class="muted">Tiền hàng sau CK trực tiếp</label><div style="padding:8px;font-weight:700;color:var(--blue)">${formatMoney(sub - state.directDiscount)} đ</div></div>
+        <div><label class="muted">Công nợ cũ</label><input id="ap-old-debt" type="number" class="input" value="${state.oldDebt}" /></div>
+        <div><label class="muted">Khách trả trước / Thanh toán</label><input id="ap-paid" type="number" class="input" value="${state.paidAmount}" /></div>
+        <div><label class="muted">TỔNG CỘNG TOA</label><div style="padding:8px;font-size:18px;font-weight:700;color:var(--red)">${formatMoney(grand)} đ</div></div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-top:10px;border-top:1px solid var(--border)">
+        <button type="button" id="ap-print-a5" class="btn btn-outline">🖨 In Hóa Đơn A5</button>
+        <div style="display:flex;gap:8px">
+          <button type="button" id="ap-cancel" class="btn btn-outline">Đóng</button>
+          <button type="button" id="ap-save" class="btn btn-success">${isCompleted ? "Lưu Cập Nhật" : "✓ Duyệt Hoàn Thành"}</button>
+        </div>
       </div>
     `);
 
+    document.getElementById("ap-close-x").onclick = closeModal;
     document.getElementById("ap-cancel").onclick = closeModal;
-    document.querySelectorAll(".ap-q").forEach(el => el.onchange = () => { items[Number(el.getAttribute("data-i"))].qty = Number(el.value) || 0; redraw(); });
-    document.querySelectorAll(".ap-p").forEach(el => el.onchange = () => { items[Number(el.getAttribute("data-i"))].price = Number(el.value) || 0; redraw(); });
-    document.querySelectorAll(".ap-c").forEach(el => el.onchange = () => { items[Number(el.getAttribute("data-i"))].ck = Number(el.value) || 0; redraw(); });
-    document.querySelectorAll(".ap-calc").forEach(el => el.onchange = redraw);
+    document.getElementById("ap-sale-sel").onchange = (e) => { state.saleName = e.target.value; };
+
+    const addInp = document.getElementById("ap-add-inp");
+    addInp.oninput = (e) => {
+      state.addQuery = e.target.value;
+      redraw();
+      const next = document.getElementById("ap-add-inp");
+      if (next) { next.focus(); next.setSelectionRange(next.value.length, next.value.length); }
+    };
+
+    document.querySelectorAll(".ap-add-pick").forEach(el => {
+      el.onclick = () => {
+        const p = APP_STATE.data.products.find(x => x.code === el.getAttribute("data-code"));
+        if (p) {
+          state.items.push({ code: p.code, name: p.name, qty: 1, price: Number(p.price || 0), ck: 0, note: "" });
+          state.addQuery = "";
+          redraw();
+        }
+      };
+    });
+
+    document.querySelectorAll(".ap-q").forEach(el => el.onchange = () => { state.items[Number(el.getAttribute("data-i"))].qty = Number(el.value) || 0; redraw(); });
+    document.querySelectorAll(".ap-p").forEach(el => el.onchange = () => { state.items[Number(el.getAttribute("data-i"))].price = Number(el.value) || 0; redraw(); });
+    document.querySelectorAll(".ap-c").forEach(el => el.onchange = () => { state.items[Number(el.getAttribute("data-i"))].ck = Number(el.value) || 0; redraw(); });
+    document.querySelectorAll(".ap-n").forEach(el => el.onchange = () => { state.items[Number(el.getAttribute("data-i"))].note = el.value; });
+    document.querySelectorAll(".ap-del-row").forEach(el => el.onclick = () => { state.items.splice(Number(el.getAttribute("data-i")), 1); redraw(); });
+
+    document.getElementById("ap-disc").onchange = (e) => { state.directDiscount = Number(e.target.value) || 0; redraw(); };
+    document.getElementById("ap-old-debt").onchange = (e) => { state.oldDebt = Number(e.target.value) || 0; redraw(); };
+    document.getElementById("ap-paid").onchange = (e) => { state.paidAmount = Number(e.target.value) || 0; redraw(); };
+
+    document.getElementById("ap-print-a5").onclick = () => {
+      printInvoiceA5({
+        id: order.id,
+        date: order.date,
+        customerName: order.customerName,
+        phone: order.phone || cust?.phone || "",
+        address: addr,
+        saleName: state.saleName,
+        totalAmount: sub,
+        directDiscount: state.directDiscount,
+        oldDebt: state.oldDebt,
+        paidAmount: state.paidAmount,
+        grandTotal: grand,
+        items: state.items
+      }, APP_STATE.invoiceConfig, APP_STATE.data.excludeMerge);
+    };
 
     document.getElementById("ap-save").onclick = async () => {
+      const payload = {
+        saleName: state.saleName,
+        totalAmount: sub,
+        oldDebt: state.oldDebt,
+        paidAmount: state.paidAmount,
+        directDiscount: state.directDiscount,
+        grandTotal: grand,
+        items: state.items
+      };
       try {
-        await callApi("processOrder", [order.id, {
-          saleName: order.saleName,
-          totalAmount: sub,
-          oldDebt: oldD,
-          paidAmount: paid,
-          directDiscount: disc,
-          grandTotal: grand,
-          items: items
-        }]);
+        if (isCompleted) {
+          await callApi("updateCompletedOrder", [order.id, payload]);
+          Swal.fire("Đã cập nhật", `Đã lưu chỉnh sửa hóa đơn ${order.id}`, "success");
+        } else {
+          await callApi("processOrder", [order.id, payload]);
+          Swal.fire("Hoàn thành", `Đã duyệt hoàn thành đơn ${order.id}!`, "success");
+        }
         closeModal();
-        Swal.fire("Hoàn thành", `Đã chuyển đơn ${order.id} sang Hoan_Thanh!`, "success");
         syncAllData(false);
       } catch (err) {
         Swal.fire("Lỗi", err.message, "error");
@@ -341,6 +633,9 @@ function openApproveOrderModal(order) {
   redraw();
 }
 
+// ==========================================
+// 4. LỊCH SỬ HÓA ĐƠN HOÀN THÀNH
+// ==========================================
 function renderCompletedInvoicesView(container) {
   const q = bodau(HIST_UI.search);
   const list = (APP_STATE.histories.hoanThanh || []).filter(h => {
