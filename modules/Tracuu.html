@@ -1,0 +1,540 @@
+<!-- =====================================================================
+  Tracuu.html  —  TRANG "TÌM KIẾM LỊCH SỬ BÁN HÀNG" (CHỈ ADMIN)
+  Gồm: CSS + khung trang + JavaScript. Chèn vào Index.html bằng đúng 1 dòng:
+      <?!= include('Tracuu'); ?>
+  (đặt sau dòng include('Scripts6'))
+  Trang tự gắn vào vùng nội dung chính và tự móc vào showPage() có sẵn,
+  nên KHÔNG cần sửa Scripts.html.
+===================================================================== -->
+
+<style>
+  #pTimKiemBH .tc-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+  #pTimKiemBH .tc-title{margin:0;font-size:20px;font-weight:800;color:var(--pri);letter-spacing:.3px;}
+  #pTimKiemBH .tc-btn-excel{display:inline-flex;align-items:center;gap:6px;background:#0ea5e9;color:#fff;border:none;padding:8px 16px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:all .1s ease;box-shadow:0 4px 0 #0284c7,0 6px 10px rgba(0,0,0,.15);}
+  #pTimKiemBH .tc-btn-excel:hover:not(:disabled){background:#38bdf8;}
+  #pTimKiemBH .tc-btn-excel:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 #0284c7,0 2px 4px rgba(0,0,0,.2);}
+  #pTimKiemBH .tc-btn-excel:disabled{opacity:.45;cursor:not-allowed;}
+
+  #pTimKiemBH .tc-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+  #pTimKiemBH .tc-field{display:flex;flex-direction:column;gap:4px;}
+  #pTimKiemBH .tc-field label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+  #pTimKiemBH .tc-field-date{flex:0 0 165px;}
+  #pTimKiemBH .tc-field-prod{flex:1 1 280px;min-width:220px;}
+  #pTimKiemBH .tc-prod-wrap{position:relative;}
+  #pTimKiemBH .tc-prod-wrap > i.fa-search{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);z-index:2;pointer-events:none;}
+  #pTimKiemBH .tc-prod-wrap .finput{padding-left:34px;padding-right:34px;}
+  #pTimKiemBH .tc-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:24px;height:24px;border-radius:50%;border:none;background:var(--bdr);color:var(--muted);font-size:16px;line-height:1;cursor:pointer;display:none;z-index:2;}
+  #pTimKiemBH .tc-clear:hover{background:var(--dan);color:#fff;}
+  #pTimKiemBH .tc-suggest{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:120;max-height:320px;margin-top:0;}
+  #pTimKiemBH .tc-suggest .sr-item.tc-active{background:var(--pri-lt);}
+  #pTimKiemBH .tc-msp{font-size:11px;font-weight:700;color:var(--info);white-space:nowrap;margin-left:10px;}
+
+  #pTimKiemBH .tc-label{margin:4px 2px 10px;font-size:12px;color:var(--muted);font-weight:600;}
+  #pTimKiemBH .tc-label b{color:var(--pri);}
+  #pTimKiemBH .tc-table-wrap{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rad-lg);overflow:hidden;}
+  #pTimKiemBH .tc-table-scroll{overflow-x:auto;}
+  #pTimKiemBH .tc-table{width:100%;border-collapse:collapse;font-size:13px;}
+  #pTimKiemBH .tc-table th{background:var(--pri-lt);color:var(--pri);font-weight:800;text-transform:uppercase;font-size:12px;padding:11px 10px;border:1px solid var(--bdr);border-bottom:2px solid var(--pri);white-space:nowrap;}
+  #pTimKiemBH .tc-table td{padding:10px;border:1px solid var(--bdr);vertical-align:top;}
+  #pTimKiemBH .tc-table tbody tr:hover{background:#f8fafc;}
+  #pTimKiemBH .tc-stt{text-align:center;color:var(--muted);font-weight:600;width:56px;}
+  #pTimKiemBH .tc-name{font-weight:700;color:var(--txt);min-width:160px;}
+  #pTimKiemBH .tc-qty{text-align:center;font-weight:800;color:var(--dan);font-size:15px;width:96px;}
+  #pTimKiemBH .tc-note{min-width:200px;}
+  #pTimKiemBH .tc-chip{display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;border-radius:12px;background:var(--pri-lt);color:var(--pri);font-weight:700;font-size:11px;border:1px solid #c7d7fb;cursor:default;}
+  #pTimKiemBH .tc-table tfoot td{background:var(--bg);font-weight:800;}
+  #pTimKiemBH .tc-loading{text-align:center;padding:40px 10px;color:var(--muted);font-weight:600;}
+
+  @media (max-width:600px){
+    #pTimKiemBH .tc-field-date{flex:1 1 calc(50% - 5px);}
+    #pTimKiemBH .tc-field-prod{flex:1 1 100%;}
+    #pTimKiemBH .tc-title{font-size:17px;}
+  }
+</style>
+
+<div id="pTimKiemBH" class="page">
+  <div class="card" style="border-top:3px solid var(--pri)">
+    <div class="tc-head">
+      <h2 class="tc-title">🔎 Tìm Kiếm Lịch Sử Bán Hàng</h2>
+      <button type="button" id="tcBtnExcel" class="tc-btn-excel" onclick="tcDownloadExcel()" disabled>
+        <i class="fas fa-file-excel"></i> TẢI FILE EXCEL
+      </button>
+    </div>
+
+    <div class="tc-filters">
+      <div class="tc-field tc-field-date">
+        <label for="tcDateFrom">Từ ngày</label>
+        <input type="date" id="tcDateFrom" class="finput" onchange="tcOnDateChange()">
+      </div>
+      <div class="tc-field tc-field-date">
+        <label for="tcDateTo">Đến ngày</label>
+        <input type="date" id="tcDateTo" class="finput" onchange="tcOnDateChange()">
+      </div>
+      <div class="tc-field tc-field-prod">
+        <label for="tcProdInp">Sản phẩm</label>
+        <div class="tc-prod-wrap">
+          <i class="fas fa-search"></i>
+          <input type="text" id="tcProdInp" class="finput" autocomplete="off"
+                 placeholder="Nhập tên hoặc mã sản phẩm..."
+                 oninput="tcOnProdInput()" onfocus="tcOnProdFocus()" onkeydown="tcProdKey(event)">
+          <button type="button" id="tcProdClear" class="tc-clear" onclick="tcClearProduct()" title="Xóa">×</button>
+          <div id="tcSuggestBox" class="search-res tc-suggest" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tcSummary" class="stat-grid" style="display:none">
+    <div class="stat-card" style="border-left:4px solid var(--dan)">
+      <div class="slabel">Tổng số lượng</div>
+      <div class="sval" id="tcSumQty" style="color:var(--dan)">0</div>
+    </div>
+    <div class="stat-card" style="border-left:4px solid var(--suc)">
+      <div class="slabel">Số cửa hàng</div>
+      <div class="sval" id="tcSumStore" style="color:var(--suc)">0</div>
+    </div>
+    <div class="stat-card" style="border-left:4px solid var(--pri)">
+      <div class="slabel">Số hóa đơn</div>
+      <div class="sval" id="tcSumOrder" style="color:var(--pri)">0</div>
+    </div>
+  </div>
+
+  <div id="tcResult">
+    <div class="empty">
+      <div class="empty-icon">🔎</div>
+      <div class="empty-title">Chọn khoảng ngày và sản phẩm để tìm kiếm</div>
+      <div class="empty-sub">Để trống cả 2 ô ngày = tìm trong toàn bộ lịch sử</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+//  TÌM KIẾM LỊCH SỬ BÁN HÀNG — phần JavaScript (mọi tên đều bắt đầu bằng "tc")
+// =====================================================================
+let tcSelected = null;      // tên sản phẩm chuẩn (đã chọn từ Danh_Muc)
+let tcLastResult = null;    // kết quả gần nhất (dùng cho Excel)
+let tcMatches = [];         // danh sách gợi ý đang hiển thị
+let tcActive = -1;          // dòng gợi ý đang được tô sáng (bàn phím)
+let tcTimer = null;         // debounce khi đổi ngày
+let tcReqSeq = 0;           // chống kết quả cũ đè kết quả mới
+let tcDatesInit = false;
+let tcExcelPromise = null;  // promise nạp thư viện ExcelJS
+
+// ---------- tiện ích ----------
+function tcEsc(s){
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function tcPad(n){ return String(n).padStart(2,'0'); }
+function tcToISO(d){ return d.getFullYear() + '-' + tcPad(d.getMonth()+1) + '-' + tcPad(d.getDate()); }
+function tcFmtDate(iso){ const p = String(iso||'').split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : ''; }
+function tcNum(n){ return Number(n || 0).toLocaleString('vi-VN'); }
+function tcSlug(s){
+  const b = (typeof bodau === 'function') ? bodau(s) : String(s||'').toLowerCase();
+  return b.replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40) || 'sanpham';
+}
+function tcRangeLabel(from, to){
+  if (from && to) return 'Từ ' + tcFmtDate(from) + ' đến ' + tcFmtDate(to);
+  if (from) return 'Từ ' + tcFmtDate(from);
+  if (to) return 'Đến ' + tcFmtDate(to);
+  return 'Tất cả thời gian';
+}
+function tcUpdateExcelBtn(){
+  const b = document.getElementById('tcBtnExcel');
+  if (b) b.disabled = !(tcLastResult && tcLastResult.rows && tcLastResult.rows.length);
+}
+
+// ---------- khi mở trang ----------
+function tcInitPage(){
+  if (!tcDatesInit){
+    const now = new Date();
+    document.getElementById('tcDateFrom').value = tcToISO(new Date(now.getFullYear(), now.getMonth(), 1));
+    document.getElementById('tcDateTo').value = tcToISO(now);
+    tcDatesInit = true;
+  }
+  // danh mục sản phẩm lấy từ db.products (Danh_Muc); nếu chưa có thì nạp lại
+  if (typeof db !== 'undefined' && (!db.products || !db.products.length) && typeof loadData === 'function') loadData();
+  tcLoadExcelJS().catch(function(){});   // nạp sẵn thư viện Excel cho lần bấm tải
+  if (!tcSelected && window.innerWidth > 768){
+    setTimeout(function(){ const i = document.getElementById('tcProdInp'); if (i) i.focus(); }, 120);
+  }
+}
+
+// ---------- ô tìm sản phẩm ----------
+function tcOnProdInput(){
+  const inp = document.getElementById('tcProdInp');
+  document.getElementById('tcProdClear').style.display = inp.value ? 'block' : 'none';
+  // gõ lại => hủy lựa chọn cũ (để đổi ngày không tìm nhầm sản phẩm cũ)
+  if (tcSelected && bodau(inp.value) !== bodau(tcSelected)) tcSelected = null;
+  tcSuggest();
+}
+function tcOnProdFocus(){ if (!tcSelected) tcSuggest(); }
+
+function tcSuggest(){
+  const box = document.getElementById('tcSuggestBox');
+  const kw = bodau(document.getElementById('tcProdInp').value);
+  tcActive = -1;
+  if (!kw){ box.style.display = 'none'; tcMatches = []; return; }
+  const prods = (typeof db !== 'undefined' && db.products) ? db.products : [];
+  tcMatches = prods.filter(function(p){
+    return p.Ten_San_Pham && (bodau(p.Ten_San_Pham).includes(kw) || bodau(p.Ma_SP || '').includes(kw));
+  }).slice(0, 30);
+
+  if (!tcMatches.length){
+    box.innerHTML = '<div class="sr-item" style="cursor:default;color:var(--muted)">Không tìm thấy sản phẩm trong danh mục</div>';
+  } else {
+    box.innerHTML = tcMatches.map(function(p, i){
+      const msp = String(p.Ma_SP || '').trim();
+      return '<div class="sr-item" data-i="' + i + '"><span><strong>' + tcEsc(p.Ten_San_Pham) + '</strong></span>' +
+             ((msp && msp.charAt(0) !== '#') ? '<span class="tc-msp">' + tcEsc(msp) + '</span>' : '') + '</div>';
+    }).join('');
+  }
+  box.style.display = 'block';
+}
+
+function tcProdKey(e){
+  const box = document.getElementById('tcSuggestBox');
+  const open = box.style.display !== 'none' && tcMatches.length > 0;
+  if (e.key === 'ArrowDown' && open){ e.preventDefault(); tcMove(1); }
+  else if (e.key === 'ArrowUp' && open){ e.preventDefault(); tcMove(-1); }
+  else if (e.key === 'Enter'){ e.preventDefault(); if (open) tcPick(tcActive >= 0 ? tcActive : 0); }
+  else if (e.key === 'Escape'){ box.style.display = 'none'; }
+}
+function tcMove(d){
+  tcActive = (tcActive + d + tcMatches.length) % tcMatches.length;
+  document.querySelectorAll('#tcSuggestBox .sr-item').forEach(function(el, i){
+    el.classList.toggle('tc-active', i === tcActive);
+    if (i === tcActive) el.scrollIntoView({ block: 'nearest' });
+  });
+}
+
+function tcPick(i){
+  const p = tcMatches[i];
+  if (!p) return;
+  tcSelected = p.Ten_San_Pham;
+  const inp = document.getElementById('tcProdInp');
+  inp.value = p.Ten_San_Pham;
+  document.getElementById('tcProdClear').style.display = 'block';
+  document.getElementById('tcSuggestBox').style.display = 'none';
+  inp.blur();
+  tcSearch();
+}
+
+function tcClearProduct(){
+  tcSelected = null;
+  tcLastResult = null;
+  tcReqSeq++;
+  const inp = document.getElementById('tcProdInp');
+  inp.value = '';
+  document.getElementById('tcProdClear').style.display = 'none';
+  document.getElementById('tcSuggestBox').style.display = 'none';
+  document.getElementById('tcSummary').style.display = 'none';
+  document.getElementById('tcResult').innerHTML =
+    '<div class="empty"><div class="empty-icon">🔎</div><div class="empty-title">Chọn khoảng ngày và sản phẩm để tìm kiếm</div>' +
+    '<div class="empty-sub">Để trống cả 2 ô ngày = tìm trong toàn bộ lịch sử</div></div>';
+  tcUpdateExcelBtn();
+  inp.focus();
+}
+
+// bấm chọn gợi ý (mousedown để không bị mất focus trước khi chọn) + bấm ra ngoài thì đóng
+document.getElementById('tcSuggestBox').addEventListener('mousedown', function(e){
+  const it = e.target.closest('.sr-item[data-i]');
+  if (it){ e.preventDefault(); tcPick(Number(it.getAttribute('data-i'))); }
+});
+document.addEventListener('click', function(e){
+  if (!e.target.closest('#pTimKiemBH .tc-prod-wrap')){
+    const b = document.getElementById('tcSuggestBox');
+    if (b) b.style.display = 'none';
+  }
+});
+
+// ---------- đổi ngày ----------
+function tcOnDateChange(){
+  clearTimeout(tcTimer);
+  tcTimer = setTimeout(function(){ if (tcSelected) tcSearch(); }, 250);
+}
+
+// ---------- gọi server ----------
+function tcSearch(){
+  if (!tcSelected) return;
+  const from = document.getElementById('tcDateFrom').value;
+  const to = document.getElementById('tcDateTo').value;
+  if (from && to && from > to){
+    appAlert("'Từ ngày' không được lớn hơn 'Đến ngày'!", 'warning');
+    return;
+  }
+  const seq = ++tcReqSeq;
+  tcLastResult = null;
+  tcUpdateExcelBtn();
+  document.getElementById('tcSummary').style.display = 'none';
+  document.getElementById('tcResult').innerHTML =
+    '<div class="tc-loading"><i class="fas fa-spinner fa-spin"></i> Đang tìm dữ liệu...</div>';
+
+  google.script.run
+    .withSuccessHandler(function(res){ if (seq === tcReqSeq) tcRender(res); })
+    .withFailureHandler(function(err){
+      if (seq !== tcReqSeq) return;
+      tcRender({ success: false, msg: (err && err.message) ? err.message : String(err) });
+    })
+    .tracuuLichSuBan(user.token, tcSelected, from, to);
+}
+
+// ---------- hiển thị kết quả ----------
+function tcRender(res){
+  const box = document.getElementById('tcResult');
+  const sum = document.getElementById('tcSummary');
+
+  if (!res || !res.success){
+    tcLastResult = null;
+    tcUpdateExcelBtn();
+    sum.style.display = 'none';
+    box.innerHTML = '<div class="empty"><div class="empty-icon">❌</div><div class="empty-title">Không tìm kiếm được</div>' +
+                    '<div class="empty-sub">' + tcEsc(res && res.msg ? res.msg : 'Lỗi không xác định') + '</div></div>';
+    return;
+  }
+
+  tcLastResult = res;
+  tcUpdateExcelBtn();
+  const label = '<div class="tc-label">Kết quả cho: <b>' + tcEsc(res.product) + '</b> — ' + tcEsc(tcRangeLabel(res.from, res.to)) + '</div>';
+
+  if (!res.rows.length){
+    sum.style.display = 'none';
+    box.innerHTML = label + '<div class="empty"><div class="empty-icon">📭</div>' +
+      '<div class="empty-title">Không có cửa hàng nào mua sản phẩm này</div>' +
+      '<div class="empty-sub">Thử mở rộng khoảng ngày</div></div>';
+    return;
+  }
+
+  document.getElementById('tcSumQty').textContent = tcNum(res.totalQty);
+  document.getElementById('tcSumStore').textContent = tcNum(res.storeCount);
+  document.getElementById('tcSumOrder').textContent = tcNum(res.totalOrders);
+  sum.style.display = 'grid';
+
+  const body = res.rows.map(function(r, i){
+    const chips = r.orders.map(function(o){
+      return '<span class="tc-chip" title="' + tcEsc(o.time + ' • SL: ' + tcNum(o.qty)) + '">' + tcEsc(o.id) + '</span>';
+    }).join('');
+    return '<tr><td class="tc-stt">' + (i + 1) + '</td><td class="tc-name">' + tcEsc(r.name) +
+           '</td><td class="tc-qty">' + tcNum(r.qty) + '</td><td class="tc-note">' + chips + '</td></tr>';
+  }).join('');
+
+  box.innerHTML = label +
+    '<div class="tc-table-wrap"><div class="tc-table-scroll"><table class="tc-table">' +
+    '<thead><tr><th>STT</th><th style="text-align:left">Tên Cửa Hàng</th><th>Số Lượng</th><th style="text-align:left">Ghi Chú</th></tr></thead>' +
+    '<tbody>' + body + '</tbody>' +
+    '<tfoot><tr><td></td><td style="text-align:right">TỔNG CỘNG</td><td class="tc-qty">' + tcNum(res.totalQty) +
+    '</td><td>' + tcNum(res.storeCount) + ' cửa hàng — ' + tcNum(res.totalOrders) + ' hóa đơn</td></tr></tfoot>' +
+    '</table></div></div>';
+}
+
+// ---------- xuất Excel (ExcelJS: hỗ trợ căn giữa, viền, cỡ chữ, màu nền) ----------
+function tcLoadExcelJS(){
+  if (typeof ExcelJS !== 'undefined' && ExcelJS.Workbook) return Promise.resolve();
+  if (tcExcelPromise) return tcExcelPromise;
+  tcExcelPromise = new Promise(function(resolve, reject){
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+    s.onload = function(){ (typeof ExcelJS !== 'undefined' && ExcelJS.Workbook) ? resolve() : reject(new Error('ExcelJS')); };
+    s.onerror = function(){ reject(new Error('ExcelJS load')); };
+    document.head.appendChild(s);
+  }).catch(function(err){ tcExcelPromise = null; throw err; });
+  return tcExcelPromise;
+}
+
+// dữ liệu dạng mảng 2 chiều — chỉ dùng cho bản CSV dự phòng
+function tcBuildAoa(r){
+  const aoa = [
+    ['TÌM KIẾM LỊCH SỬ BÁN HÀNG'],
+    ['Sản phẩm: ' + r.product],
+    ['Thời gian: ' + tcRangeLabel(r.from, r.to)],
+    [],
+    ['', 'TỔNG CỘNG', r.totalQty, r.storeCount + ' cửa hàng — ' + r.totalOrders + ' hóa đơn'],
+    ['STT', 'Tên Cửa Hàng', 'Số Lượng', 'Ghi Chú']
+  ];
+  r.rows.forEach(function(x, i){
+    aoa.push([i + 1, x.name, x.qty, x.orders.map(function(o){ return o.id; }).join(', ')]);
+  });
+  return aoa;
+}
+
+// dựng workbook có định dạng: tiêu đề to + căn giữa, bảng có viền, dữ liệu căn giữa
+function tcBuildWorkbook(r){
+  const FONT = 'Calibri';
+  const thin = { style: 'thin', color: { argb: 'FF000000' } };
+  const BORDER = { top: thin, left: thin, bottom: thin, right: thin };
+  const CENTER = { vertical: 'middle', horizontal: 'center', wrapText: true };
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('LichSuBan');
+  ws.columns = [{ width: 7 }, { width: 38 }, { width: 14 }, { width: 70 }];
+
+  // --- 3 dòng tiêu đề (gộp A:D, chữ to hơn, căn giữa) ---
+  const heads = [
+    { text: 'TÌM KIẾM LỊCH SỬ BÁN HÀNG',               size: 18, bold: true,  color: 'FF1E3A8A', h: 36 },
+    { text: 'Sản phẩm: ' + r.product,                   size: 13, bold: true,  color: 'FF000000', h: 26 },
+    { text: 'Thời gian: ' + tcRangeLabel(r.from, r.to), size: 13, bold: false, color: 'FF000000', h: 26 }
+  ];
+  heads.forEach(function(h, i){
+    const rowNo = i + 1;
+    ws.mergeCells(rowNo, 1, rowNo, 4);
+    const c = ws.getCell(rowNo, 1);
+    c.value = h.text;
+    c.font = { name: FONT, size: h.size, bold: h.bold, color: { argb: h.color } };
+    c.alignment = { vertical: 'middle', horizontal: 'center' };
+    ws.getRow(rowNo).height = h.h;
+  });
+  ws.getRow(4).height = 10;   // dòng trống ngăn cách
+
+  // --- dòng 5 là TỔNG CỘNG (trên cùng), dòng 6 là tiêu đề cột ---
+  const HEAD_ROW = 6;
+  ['STT', 'Tên Cửa Hàng', 'Số Lượng', 'Ghi Chú'].forEach(function(t, i){
+    const c = ws.getCell(HEAD_ROW, i + 1);
+    c.value = t;
+    c.font = { name: FONT, size: 12, bold: true, color: { argb: 'FF1E3A8A' } };
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+    c.alignment = CENTER;
+    c.border = BORDER;
+  });
+  ws.getRow(HEAD_ROW).height = 26;
+
+  // --- dòng tổng cộng: nằm trên dòng tiêu đề cột, chỉ in đậm + căn giữa (không viền, không nền) ---
+  const totalRow = HEAD_ROW - 1;
+  const totals = [null, 'TỔNG CỘNG', Number(r.totalQty) || 0, r.storeCount + ' cửa hàng — ' + r.totalOrders + ' hóa đơn'];
+  totals.forEach(function(v, ci){
+    if (v === null) return;
+    const c = ws.getCell(totalRow, ci + 1);
+    c.value = v;
+    c.font = { name: FONT, size: 12, bold: true };
+    c.alignment = CENTER;
+    if (ci === 2) c.numFmt = '#,##0';
+  });
+  ws.getRow(totalRow).height = 26;
+
+  // --- dữ liệu (căn giữa, có viền) — bắt đầu từ dòng ngay sau tiêu đề cột ---
+  r.rows.forEach(function(x, i){
+    const rowNo = HEAD_ROW + 1 + i;
+    const note = x.orders.map(function(o){ return o.id; }).join(', ');
+    const vals = [i + 1, x.name, Number(x.qty) || 0, note];
+    vals.forEach(function(v, ci){
+      const c = ws.getCell(rowNo, ci + 1);
+      c.value = v;
+      c.font = { name: FONT, size: 11, bold: ci === 2 };
+      c.alignment = CENTER;
+      c.border = BORDER;
+      if (ci === 2) c.numFmt = '#,##0';
+    });
+    // ước lượng chiều cao dòng theo số dòng chữ (ô Ghi Chú / Tên cửa hàng tự xuống dòng)
+    const lines = Math.max(1, Math.ceil(note.length / 68), Math.ceil(String(x.name || '').length / 34));
+    ws.getRow(rowNo).height = Math.max(22, lines * 15 + 7);
+  });
+
+  return wb;
+}
+
+function tcSaveBlob(blob, fileName){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+}
+
+function tcCsvCell(v){
+  const s = String(v == null ? '' : v);
+  return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function tcDownloadExcel(){
+  const r = tcLastResult;
+  if (!r || !r.rows || !r.rows.length){ appToast('Chưa có dữ liệu để tải!', 'warning'); return; }
+
+  const base = 'TimKiem_' + tcSlug(r.product) + '_' + (r.from || 'tatca') + '_' + (r.to || 'tatca');
+  const btn = document.getElementById('tcBtnExcel');
+  const oldHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ĐANG TẠO...';
+
+  tcLoadExcelJS().then(function(){
+    return tcBuildWorkbook(r).xlsx.writeBuffer();
+  }).then(function(buf){
+    tcSaveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), base + '.xlsx');
+    appToast('Đã tải file Excel!');
+  }).catch(function(){
+    // dự phòng: không nạp được thư viện Excel (mất mạng...) -> xuất CSV, Excel vẫn mở được
+    const csv = '\uFEFF' + tcBuildAoa(r).map(function(row){ return row.map(tcCsvCell).join(','); }).join('\r\n');
+    tcSaveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), base + '.csv');
+    appToast('Không nạp được thư viện Excel — đã xuất file CSV (mở được bằng Excel).', 'info');
+  }).then(function(){
+    btn.innerHTML = oldHtml;
+    tcUpdateExcelBtn();
+  });
+}
+
+// =====================================================================
+//  GẮN VÀO HỆ THỐNG CÓ SẴN (không cần sửa Scripts.html)
+// =====================================================================
+
+// 1) Đưa khung trang vào đúng vùng nội dung chính (cùng chỗ với các trang khác)
+(function tcMount(){
+  const page = document.getElementById('pTimKiemBH');
+  const ref = document.getElementById('pOrder');
+  if (page && ref && ref.parentNode && page.parentNode !== ref.parentNode) ref.parentNode.appendChild(page);
+})();
+
+// 2) Móc vào showPage(): chặn người không phải Admin + khởi tạo trang khi mở
+(function tcHookShowPage(){
+  const orig = window.showPage;
+  if (typeof orig !== 'function' || orig.__tcHooked) return;
+  window.showPage = function(p, isBack){
+    if (p === 'timKiemBH'){
+      const role = String((typeof user !== 'undefined' && user.role) || '').trim().toLowerCase();
+      if (role !== 'admin'){ appAlert('Bạn không có quyền truy cập trang này!', 'error'); return; }
+    }
+    const r = orig.apply(this, arguments);
+    if (p === 'timKiemBH') tcInitPage();
+    return r;
+  };
+  window.showPage.__tcHooked = true;
+})();
+
+// ===== BẢN CUỐI: tự kiểm tra quyền mỗi giây, không phụ thuộc setupUI =====
+function tcApplyRole(){
+  const role = String((typeof user !== 'undefined' && user && user.role) || '').trim().toLowerCase();
+  const isAdmin = (role === 'admin');
+
+  // Menu ngang (dòng topTimKiemBH đã có sẵn trong Index.html)
+  const top = document.getElementById('topTimKiemBH');
+  if (top) top.style.display = isAdmin ? 'block' : 'none';
+
+  // Menu dọc: tự tạo mục nếu chưa có
+  let side = document.getElementById('sbTimKiemBH');
+  if (!side) {
+    const wrap = document.getElementById('sbItems-quanLy');
+    if (wrap) {
+      side = document.createElement('div');
+      side.className = 'sb-item';
+      side.id = 'sbTimKiemBH';
+      side.setAttribute('data-tab', 'timKiemBH');
+      side.innerHTML = '<i class="fas fa-search"></i> Tìm Kiếm';
+      side.onclick = function(){ showPage('timKiemBH'); closeSidebar(); };
+      wrap.appendChild(side);
+    }
+  }
+  if (side) side.style.display = isAdmin ? 'flex' : 'none';
+
+  const grp = document.getElementById('sbSectionQuanLy');
+  if (grp && isAdmin) grp.style.display = 'block';
+}
+setInterval(function(){ try { tcApplyRole(); } catch(e){} }, 1000);
+(function tcHookSetupUI(){
+  const orig = window.setupUI;
+  if (typeof orig !== 'function' || orig.__tcHooked) return;
+  window.setupUI = function(){
+    const r = orig.apply(this, arguments);
+    try { tcApplyRole(); } catch (e) {}
+    return r;
+  };
+  window.setupUI.__tcHooked = true;
+})();
+</script>
