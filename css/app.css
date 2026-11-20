@@ -19,7 +19,7 @@ body {
   color: var(--text);
 }
 
-/* Chống iOS/Android tự phóng to khi gõ input */
+/* Chống điện thoại tự phóng to khi gõ input */
 input, select, textarea, button {
   font-size: 16px;
   font-family: inherit;
