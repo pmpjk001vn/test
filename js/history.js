@@ -5,9 +5,10 @@ const HIST_UI = {
   toDate: "",
   statusFilter: "all",
   scopeFilter: "all",
+  saleFilter: "all",
 
-  // State riêng cho Xử Lý Đơn Hàng
-  procTab: "all", // "all" | "pending" | "completed" | "cancelled"
+  // State cho Xử Lý Đơn Hàng
+  procTab: "all",
   procExactDate: "",
   procInvoiceCode: "",
   procSearch: "",
@@ -37,13 +38,19 @@ function getDateFilterLabel(key) {
 function matchExactDate(dateStr, yyyyMmDd) {
   if (!yyyyMmDd) return true;
   if (!dateStr) return false;
-  const parts = yyyyMmDd.split("-"); // [yyyy, mm, dd]
+  const parts = yyyyMmDd.split("-");
   const ddMmYyyy = `${parts[2]}/${parts[1]}/${parts[0]}`;
   return String(dateStr).includes(ddMmYyyy) || String(dateStr).includes(yyyyMmDd);
 }
 
+function findProductCode(item) {
+  if (item.code) return item.code;
+  const found = APP_STATE.data.products.find(p => bodau(p.name) === bodau(item.name));
+  return found?.code || "---";
+}
+
 // ==========================================
-// 1. QUẢN LÝ ĐƠN HÀNG (LỊCH SỬ LÊN ĐƠN)
+// 1. QUẢN LÝ ĐƠN HÀNG + POPUP CHI TIẾT ĐƠN (HÌNH 3)
 // ==========================================
 function renderOrderManagementView(container) {
   const currentUserName = APP_STATE.user?.fullName || "";
@@ -51,6 +58,7 @@ function renderOrderManagementView(container) {
 
   const baseRows = (APP_STATE.histories.hoaDon || []).filter(h => {
     if (HIST_UI.scopeFilter === "mine" && h.saleName !== currentUserName) return false;
+    if (HIST_UI.saleFilter !== "all" && h.saleName !== HIST_UI.saleFilter) return false;
     if (!isDateInRange(h.date, HIST_UI.dateFilter, HIST_UI.fromDate, HIST_UI.toDate)) return false;
     if (!q) return true;
     return bodau(h.id).includes(q) || bodau(h.customerName).includes(q) || bodau(h.saleName).includes(q);
@@ -58,11 +66,11 @@ function renderOrderManagementView(container) {
 
   const totalRevenue = baseRows.reduce((s, h) => s + Number(h.totalAmount || 0), 0);
   const totalOrders = baseRows.length;
-  const waitingPrintCount = baseRows.filter(h => h.status !== "Đã in").length;
+  const waitingPrintCount = baseRows.filter(h => h.status === "Chờ in" || !h.status).length;
   const printedCount = baseRows.filter(h => h.status === "Đã in").length;
 
   const rows = baseRows.filter(h => {
-    if (HIST_UI.statusFilter === "Chờ in") return h.status !== "Đã in";
+    if (HIST_UI.statusFilter === "Chờ in") return h.status === "Chờ in" || !h.status;
     if (HIST_UI.statusFilter === "Đã in") return h.status === "Đã in";
     return true;
   });
@@ -119,8 +127,14 @@ function renderOrderManagementView(container) {
         </label>
       </div>
 
-      <input id="hist-search" type="text" class="input" value="${HIST_UI.search.replace(/"/g, "&quot;")}"
-        placeholder="Tìm nhanh tên khách hàng, mã HĐ, Sale..." style="margin-bottom:12px" />
+      <div class="grid-2" style="margin-bottom:12px">
+        <input id="hist-search" type="text" class="input" value="${HIST_UI.search.replace(/"/g, "&quot;")}"
+          placeholder="Tìm nhanh tên khách hàng, mã HĐ..." />
+        <select id="hist-sale-filter" class="input">
+          <option value="all" ${HIST_UI.saleFilter === "all" ? "selected" : ""}>Tất cả nhân viên</option>
+          ${APP_STATE.data.staffs.map(s => `<option value="${s.fullName}" ${HIST_UI.saleFilter === s.fullName ? "selected" : ""}>${s.fullName}</option>`).join("")}
+        </select>
+      </div>
 
       <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:12px">
         <span class="muted" style="font-size:12px;font-weight:700;margin-right:4px">KHOẢNG THỜI GIAN:</span>
@@ -144,19 +158,22 @@ function renderOrderManagementView(container) {
           </tr></thead>
           <tbody>
             ${rows.length === 0 ? `<tr><td colspan="7" class="text-center muted" style="padding:20px">Không có đơn hàng nào phù hợp bộ lọc</td></tr>` :
-              rows.map((h, i) => `<tr>
-                <td><b>${h.id || "---"}</b></td>
-                <td>${h.date || "---"}</td>
-                <td><b>${h.customerName}</b></td>
-                <td>${h.saleName || "---"}</td>
-                <td class="text-right"><b>${formatMoney(h.totalAmount)} đ</b></td>
-                <td><span class="badge ${h.status === "Đã in" ? "red" : ""}">${h.status || "Chờ in"}</span></td>
-                <td style="white-space:nowrap">
-                  <button type="button" class="btn btn-outline btn-sm hist-print" data-i="${i}">In A5</button>
-                  <button type="button" class="btn btn-primary btn-sm hist-edit" data-i="${i}">Sửa</button>
-                  <button type="button" class="btn btn-danger btn-sm hist-del" data-id="${h.id}">Xóa</button>
-                </td>
-              </tr>`).join("")}
+              rows.map((h, i) => {
+                const stCls = h.status === "Hoàn thành" ? "background:var(--green)" : h.status === "Đã in" ? "background:var(--blue)" : "background:var(--amber)";
+                return `<tr class="hist-row-preview" data-i="${i}" style="cursor:pointer">
+                  <td><b style="color:var(--blue)">${h.id || "---"}</b></td>
+                  <td>${h.date || "---"}</td>
+                  <td><b>${h.customerName}</b></td>
+                  <td>${h.saleName || "---"}</td>
+                  <td class="text-right"><b>${formatMoney(h.totalAmount)} đ</b></td>
+                  <td><span class="badge" style="${stCls}">${h.status || "Chờ in"}</span></td>
+                  <td style="white-space:nowrap" onclick="event.stopPropagation()">
+                    <button type="button" class="btn btn-outline btn-sm hist-print" data-i="${i}">In Nháp</button>
+                    <button type="button" class="btn btn-primary btn-sm hist-edit" data-i="${i}">Sửa</button>
+                    <button type="button" class="btn btn-danger btn-sm hist-del" data-id="${h.id}">Xóa</button>
+                  </td>
+                </tr>`;
+              }).join("")}
           </tbody>
         </table>
       </div>
@@ -171,6 +188,11 @@ function renderOrderManagementView(container) {
   document.querySelectorAll('input[name="hist-scope"]').forEach(r => {
     r.onchange = (e) => { HIST_UI.scopeFilter = e.target.value; renderOrderManagementView(container); };
   });
+
+  document.getElementById("hist-sale-filter").onchange = (e) => {
+    HIST_UI.saleFilter = e.target.value;
+    renderOrderManagementView(container);
+  };
 
   document.getElementById("hist-search").oninput = (e) => {
     HIST_UI.search = e.target.value;
@@ -196,13 +218,23 @@ function renderOrderManagementView(container) {
     document.getElementById("hist-to").onchange = (e) => { HIST_UI.toDate = e.target.value; renderOrderManagementView(container); };
   }
 
+  // Nhấp vào dòng đơn -> mở popup Chi tiết đơn hàng (Hình 3)
+  document.querySelectorAll(".hist-row-preview").forEach(tr => {
+    tr.onclick = () => {
+      const ord = rows[Number(tr.getAttribute("data-i"))];
+      if (ord) openOrderDetailPreviewModal(ord);
+    };
+  });
+
   document.querySelectorAll(".hist-print").forEach(btn => {
     btn.onclick = async () => {
       const ord = rows[Number(btn.getAttribute("data-i"))];
       const cust = APP_STATE.data.customers.find(c => c.name === ord.customerName);
       printExportSlipA5(ord, cust?.debt || 0);
-      await callApi("markAsPrinted", [ord.id]);
-      syncAllData(false);
+      if (ord.status !== "Hoàn thành") {
+        await callApi("markAsPrinted", [ord.id]);
+        syncAllData(false);
+      }
     };
   });
 
@@ -224,11 +256,100 @@ function renderOrderManagementView(container) {
   });
 }
 
+function openOrderDetailPreviewModal(order) {
+  const cust = APP_STATE.data.customers.find(c => c.name === order.customerName);
+  const addr = order.address || cust?.address || "";
+  const oldDebt = Number(cust?.debt || 0);
+
+  openModal(`
+    <div style="background:var(--blue);color:#fff;padding:12px 16px;margin:-16px -16px 14px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:700;font-size:16px">Chi tiết đơn hàng</div>
+      <button type="button" id="dt-close-x" class="icon-btn" style="padding:4px 10px">✕</button>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:10px">
+      <div style="border:1px solid var(--border);border-radius:10px;padding:10px">
+        <div class="muted" style="font-size:11px;font-weight:700">MÃ ĐƠN</div>
+        <div style="font-weight:700;color:var(--blue);font-size:16px">${order.id || "---"}</div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:10px;padding:10px">
+        <div class="muted" style="font-size:11px;font-weight:700">THỜI GIAN</div>
+        <div style="font-weight:700;font-size:15px">${order.date || "---"}</div>
+      </div>
+    </div>
+
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 12px;margin-bottom:12px">
+      <div style="font-weight:700;color:var(--blue);font-size:15px">${order.customerName || "Khách lẻ"}</div>
+      ${addr ? `<div class="muted" style="font-size:13px;margin-top:2px">${addr}</div>` : ""}
+    </div>
+
+    <div class="table-wrap" style="margin-bottom:14px">
+      <table>
+        <thead><tr>
+          <th width="34">#</th><th width="80">MÃ SP</th><th>SẢN PHẨM</th><th width="50">SL</th>
+          <th class="text-right" width="85">GIÁ</th><th width="55">CK%</th>
+          <th class="text-right" width="85">SAU CK</th><th class="text-right" width="95">T.TIỀN</th><th>GHI CHÚ</th>
+        </tr></thead>
+        <tbody>
+          ${(order.items || []).map((it, idx) => {
+            const afterCk = Number(it.price || 0) * (1 - Number(it.ck || 0) / 100);
+            const lineTot = afterCk * Number(it.qty || 0);
+            return `<tr>
+              <td>${idx + 1}</td>
+              <td style="color:var(--blue);font-weight:700">${findProductCode(it)}</td>
+              <td><b>${it.name}</b></td>
+              <td style="color:var(--blue);font-weight:700">${it.qty}</td>
+              <td class="text-right">${formatMoney(it.price)}</td>
+              <td style="color:var(--amber);font-weight:600">${it.ck || 0}%</td>
+              <td class="text-right" style="color:var(--green);font-weight:700">${formatMoney(afterCk)}</td>
+              <td class="text-right" style="color:var(--red);font-weight:700">${formatMoney(lineTot)}</td>
+              <td class="muted">${it.note || ""}</td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;padding-top:10px;border-top:1px solid var(--border);margin-bottom:14px">
+      <div>
+        <div class="muted" style="font-size:11px;font-weight:700">CÔNG NỢ CŨ</div>
+        <div style="font-weight:700;font-size:16px">${formatMoney(oldDebt)} VNĐ</div>
+      </div>
+      <div class="text-right">
+        <div class="muted" style="font-size:11px;font-weight:700">TỔNG CỘNG</div>
+        <div style="font-weight:700;font-size:18px;color:var(--red)">${formatMoney(order.totalAmount)} VNĐ</div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+      <button type="button" id="dt-print" class="btn btn-primary">🖨 In Nháp (A5)</button>
+      <button type="button" id="dt-close" class="btn btn-outline">Đóng</button>
+      <button type="button" id="dt-delete" class="btn btn-danger">Xóa đơn</button>
+    </div>
+  `);
+
+  document.getElementById("dt-close-x").onclick = closeModal;
+  document.getElementById("dt-close").onclick = closeModal;
+  document.getElementById("dt-print").onclick = async () => {
+    printExportSlipA5(order, oldDebt);
+    if (order.status !== "Hoàn thành") {
+      await callApi("markAsPrinted", [order.id]);
+      syncAllData(false);
+    }
+  };
+  document.getElementById("dt-delete").onclick = async () => {
+    const ok = await Swal.fire({ title: `Xóa đơn ${order.id}?`, icon: "warning", showCancelButton: true });
+    if (!ok.isConfirmed) return;
+    await callApi("deleteOrder", [order.id]);
+    closeModal();
+    syncAllData(false);
+  };
+}
+
 // ==========================================
 // 2. XỬ LÝ ĐƠN HÀNG (CHỜ XỬ LÝ / HOÀN THÀNH / HỦY TOA)
 // ==========================================
 function renderProcessOrdersView(container) {
-  // Chỉ lấy đơn trạng thái "Đã in" từ Don_Hang đưa sang "Chờ xử lý"
   const pendingOrders = (APP_STATE.histories.hoaDon || [])
     .filter(h => h.status === "Đã in")
     .map(h => Object.assign({}, h, { _procType: "pending", _label: "Chờ xử lý" }));
@@ -376,10 +497,7 @@ function renderProcessOrdersView(container) {
     renderProcessOrdersView(container);
   };
   if (document.getElementById("proc-clear-date")) {
-    document.getElementById("proc-clear-date").onclick = () => {
-      HIST_UI.procExactDate = "";
-      renderProcessOrdersView(container);
-    };
+    document.getElementById("proc-clear-date").onclick = () => { HIST_UI.procExactDate = ""; renderProcessOrdersView(container); };
   }
 
   const openByCode = () => {
@@ -429,7 +547,7 @@ function renderProcessOrdersView(container) {
 }
 
 // ==========================================
-// 3. POPUP XỬ LÝ ĐƠN (GIỐNG HÌNH 3)
+// 3. POPUP XỬ LÝ ĐƠN (HÌNH 1 - IN & HOÀN THÀNH + TRỪ KHO)
 // ==========================================
 function openApproveOrderModal(order) {
   const cust = APP_STATE.data.customers.find(c => c.name === order.customerName);
@@ -442,6 +560,7 @@ function openApproveOrderModal(order) {
     directDiscount: Number(order.directDiscount || 0),
     oldDebt: Number(order.oldDebt !== undefined && isCompleted ? order.oldDebt : (cust?.debt || 0)),
     paidAmount: Number(order.paidAmount || 0),
+    adminNote: order.adminNote || "",
     addQuery: ""
   };
 
@@ -450,7 +569,8 @@ function openApproveOrderModal(order) {
       const afterCk = Number(it.price || 0) * (1 - Number(it.ck || 0) / 100);
       return s + afterCk * Number(it.qty || 0);
     }, 0);
-    const grand = sub - state.directDiscount + state.oldDebt - state.paidAmount;
+    const afterDisc = sub - state.directDiscount;
+    const grand = afterDisc + state.oldDebt - state.paidAmount;
 
     const qAdd = bodau(state.addQuery);
     const addMatches = !qAdd
@@ -538,25 +658,48 @@ function openApproveOrderModal(order) {
         </div>
       </div>
 
-      <div class="grid-2" style="margin-bottom:12px">
-        <div><label class="muted">Tiền hàng sau CK trực tiếp</label><div style="padding:8px;font-weight:700;color:var(--blue)">${formatMoney(sub - state.directDiscount)} đ</div></div>
-        <div><label class="muted">Công nợ cũ</label><input id="ap-old-debt" type="number" class="input" value="${state.oldDebt}" /></div>
-        <div><label class="muted">Khách trả trước / Thanh toán</label><input id="ap-paid" type="number" class="input" value="${state.paidAmount}" /></div>
-        <div><label class="muted">TỔNG CỘNG TOA</label><div style="padding:8px;font-size:18px;font-weight:700;color:var(--red)">${formatMoney(grand)} đ</div></div>
+      <div style="background:#f8fafc;border:2px solid #93c5fd;border-radius:12px;padding:12px 14px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;padding:4px 0">
+          <span class="muted" style="font-weight:700;font-size:12px">TỔNG ĐƠN HÀNG NÀY</span>
+          <b style="font-size:15px">${formatMoney(afterDisc)}đ</b>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed #cbd5e1">
+          <span class="muted" style="font-weight:700;font-size:12px">NỢ CŨ</span>
+          <b>${formatMoney(state.oldDebt)}đ</b>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed #cbd5e1">
+          <span style="font-weight:700;font-size:12px;color:var(--blue)">💳 KHÁCH THANH TOÁN TRƯỚC</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input id="ap-paid" type="number" class="input" value="${state.paidAmount}" style="width:140px;text-align:right;padding:5px 8px;font-weight:700" />
+            <b>đ</b>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px">
+          <div>
+            <div style="font-weight:700;font-size:14px;color:var(--blue)">TỔNG CỘNG TOA</div>
+            <div class="muted" style="font-size:11px">${state.directDiscount > 0 ? `Đã trừ CK ${formatMoney(state.directDiscount)}đ` : "Không có trừ chiết khấu"}</div>
+          </div>
+          <div style="font-weight:700;font-size:20px;color:var(--blue)">${formatMoney(grand)}đ</div>
+        </div>
       </div>
 
-      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-top:10px;border-top:1px solid var(--border)">
-        <button type="button" id="ap-print-a5" class="btn btn-outline">🖨 In Hóa Đơn A5</button>
-        <div style="display:flex;gap:8px">
-          <button type="button" id="ap-cancel" class="btn btn-outline">Đóng</button>
-          <button type="button" id="ap-save" class="btn btn-success">${isCompleted ? "Lưu Cập Nhật" : "✓ Duyệt Hoàn Thành"}</button>
-        </div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;color:#b45309;margin-bottom:4px">✍ GHI CHÚ THÊM CỦA ADMIN (IN LÊN HÓA ĐƠN)</div>
+        <textarea id="ap-admin-note" class="input" rows="2" placeholder="Nhập ghi chú mới nếu cần...">${state.adminNote.replace(/</g, "&lt;")}</textarea>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:10px;border-top:1px solid var(--border)">
+        <button type="button" id="ap-cancel" class="btn btn-outline">Đóng</button>
+        <button type="button" id="ap-print-complete" class="btn btn-primary">
+          🖨 ${isCompleted ? "In Lại & Lưu Cập Nhật" : "In Hóa Đơn & Hoàn thành"}
+        </button>
       </div>
     `);
 
     document.getElementById("ap-close-x").onclick = closeModal;
     document.getElementById("ap-cancel").onclick = closeModal;
     document.getElementById("ap-sale-sel").onchange = (e) => { state.saleName = e.target.value; };
+    document.getElementById("ap-admin-note").oninput = (e) => { state.adminNote = e.target.value; };
 
     const addInp = document.getElementById("ap-add-inp");
     addInp.oninput = (e) => {
@@ -584,47 +727,54 @@ function openApproveOrderModal(order) {
     document.querySelectorAll(".ap-del-row").forEach(el => el.onclick = () => { state.items.splice(Number(el.getAttribute("data-i")), 1); redraw(); });
 
     document.getElementById("ap-disc").onchange = (e) => { state.directDiscount = Number(e.target.value) || 0; redraw(); };
-    document.getElementById("ap-old-debt").onchange = (e) => { state.oldDebt = Number(e.target.value) || 0; redraw(); };
     document.getElementById("ap-paid").onchange = (e) => { state.paidAmount = Number(e.target.value) || 0; redraw(); };
 
-    document.getElementById("ap-print-a5").onclick = () => {
-      printInvoiceA5({
-        id: order.id,
-        date: order.date,
-        customerName: order.customerName,
-        phone: order.phone || cust?.phone || "",
-        address: addr,
-        saleName: state.saleName,
-        totalAmount: sub,
-        directDiscount: state.directDiscount,
-        oldDebt: state.oldDebt,
-        paidAmount: state.paidAmount,
-        grandTotal: grand,
-        items: state.items
-      }, APP_STATE.invoiceConfig, APP_STATE.data.excludeMerge);
-    };
+    document.getElementById("ap-print-complete").onclick = async () => {
+      const btn = document.getElementById("ap-print-complete");
+      btn.disabled = true;
+      btn.textContent = "Đang xử lý & trừ kho...";
 
-    document.getElementById("ap-save").onclick = async () => {
       const payload = {
+        customerName: order.customerName,
         saleName: state.saleName,
         totalAmount: sub,
         oldDebt: state.oldDebt,
         paidAmount: state.paidAmount,
         directDiscount: state.directDiscount,
         grandTotal: grand,
+        adminNote: state.adminNote,
         items: state.items
       };
+
       try {
         if (isCompleted) {
           await callApi("updateCompletedOrder", [order.id, payload]);
-          Swal.fire("Đã cập nhật", `Đã lưu chỉnh sửa hóa đơn ${order.id}`, "success");
         } else {
           await callApi("processOrder", [order.id, payload]);
-          Swal.fire("Hoàn thành", `Đã duyệt hoàn thành đơn ${order.id}!`, "success");
         }
+
+        printInvoiceA5({
+          id: order.id,
+          date: order.date,
+          customerName: order.customerName,
+          phone: order.phone || cust?.phone || "",
+          address: addr,
+          saleName: state.saleName,
+          totalAmount: sub,
+          directDiscount: state.directDiscount,
+          oldDebt: state.oldDebt,
+          paidAmount: state.paidAmount,
+          grandTotal: grand,
+          adminNote: state.adminNote,
+          items: state.items
+        }, APP_STATE.invoiceConfig, APP_STATE.data.excludeMerge);
+
         closeModal();
+        Swal.fire("Hoàn thành", `Đã in hóa đơn & trừ kho cho đơn ${order.id}!`, "success");
         syncAllData(false);
       } catch (err) {
+        btn.disabled = false;
+        btn.textContent = "🖨 In Hóa Đơn & Hoàn thành";
         Swal.fire("Lỗi", err.message, "error");
       }
     };
