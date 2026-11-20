@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Quản Lý Ánh Dương - Thiết Bị Kim Khí</title>
+  <link rel="stylesheet" href="css/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div id="login-screen" class="login-wrap">
+    <div class="login-card">
+      <h1>QUẢN LÝ ÁNH DƯƠNG</h1>
+      <p class="muted">Công Ty TNHH Thiết Bị Kim Khí Ánh Dương</p>
+      <form id="login-form">
+        <label>Tên đăng nhập</label>
+        <input id="login-user" type="text" placeholder="Nhập tài khoản..." required />
+        <label>Mật khẩu</label>
+        <input id="login-pass" type="password" placeholder="Nhập mật khẩu..." required />
+        <label class="checkbox-row">
+          <input id="login-remember" type="checkbox" checked />
+          <span>Duy trì đăng nhập (7 ngày)</span>
+        </label>
+        <button id="login-btn" type="submit" class="btn btn-primary full-w">Đăng Nhập Hệ Thống</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="app-screen" class="hidden">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button id="btn-sidebar" type="button" class="icon-btn">☰</button>
+        <span class="brand" id="brand-home">ÁNH DƯƠNG</span>
+        <span id="role-badge" class="role-pill"></span>
+      </div>
+      <nav id="desktop-nav" class="desktop-nav"></nav>
+      <div class="topbar-right">
+        <button id="btn-sync" type="button" class="icon-btn" title="Đồng bộ">↻</button>
+        <span id="user-name" class="user-label"></span>
+        <button id="btn-logout" type="button" class="icon-btn danger" title="Đăng xuất">⎋</button>
+      </div>
+    </header>
+
+    <div id="sidebar-backdrop" class="sidebar-backdrop hidden"></div>
+    <aside id="mobile-sidebar" class="sidebar hidden"></aside>
+
+    <main id="main-view" class="container"></main>
+  </div>
+
+  <div id="modal-backdrop" class="modal-backdrop hidden">
+    <div id="modal-box" class="modal-box"></div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/order.js"></script>
+  <script src="js/history.js"></script>
+  <script src="js/finance.js"></script>
+  <script src="js/admin.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
