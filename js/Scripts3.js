@@ -1,5 +1,10 @@
 // ===== BÁO CÁO THỐNG KÊ =====
 function showReport(type) {
+  const role = (user.role || '').toLowerCase().trim();
+  if (role !== 'admin' && role !== 'leader') {
+    appAlert("Bạn không có quyền xem Báo Cáo!", "warning");
+    return;
+  }
   showPage('report');
   document.querySelector('input[name="reportType"][value="'+type+'"]').checked = true;
   if(!db.history) {
@@ -353,14 +358,11 @@ let currentDetailStoreName = "";
 let currentStoreDetailPage = 1;
 let currentStoreDetailProductFilter = "";
 
-function changeStorePage(page) {
-  renderStoreReport(null, page);
-}
+function changeStorePage(page) { renderStoreReport(null, page); }
 
 function searchStoreReport() {
   const searchInp = document.getElementById('storeSearchInp');
   const saleSelect = document.getElementById('storeSaleFilter');
-  
   const keyword = searchInp ? searchInp.value.toLowerCase().trim() : "";
   currentStoreSaleFilter = saleSelect ? saleSelect.value : "ALL";
   
@@ -369,7 +371,6 @@ function searchStoreReport() {
     let matchSale = currentStoreSaleFilter !== "ALL" ? (s.topSale === currentStoreSaleFilter) : true;
     return matchName && matchSale;
   });
-  
   renderStoreReport(null, 1); 
 }
 
@@ -385,7 +386,6 @@ function renderStoreReport(orders = null, page = 1) {
       storeMap[name].total += Number(o.total || 0);
       storeMap[name].count++;
       storeMap[name].orders.push(o);
-      
       let sName = String(o.sale || 'Không rõ').trim();
       storeMap[name].sales[sName] = (storeMap[name].sales[sName] || 0) + 1;
     });
@@ -398,7 +398,6 @@ function renderStoreReport(orders = null, page = 1) {
     });
 
     storeReportData.sort((a, b) => b.total - a.total);
-    
     const keyword = document.getElementById('storeSearchInp')?.value.toLowerCase().trim() || "";
     filteredStoreData = storeReportData.filter(s => {
       let mN = keyword ? bodau(s.name).includes(bodau(keyword)) : true;
@@ -516,7 +515,6 @@ function renderStoreReport(orders = null, page = 1) {
 
 function showStoreDetail(storeName, page = 1) {
   isViewingStoreDetail = true; 
-  
   const mainView = document.getElementById('storeMainView');
   const detailView = document.getElementById('storeDetailView');
   if(mainView) mainView.style.display = 'none';
@@ -626,6 +624,10 @@ function getReportDateLabel() {
 }
 
 function printReport() {
+  if (!isAdminRole()) {
+    appAlert("Bạn không có quyền thực hiện lệnh in!", "error");
+    return;
+  }
   const type = document.querySelector('input[name="reportType"]:checked').value;
   const allCompleted = db.historyHoanThanh || [];
   
@@ -643,13 +645,7 @@ function printReport() {
   let dateLabel = originalLabel; 
 
   const today = new Date();
-  const formatPrintDate = (d) => {
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const yyyy = d.getFullYear();
-    return `${dd}/${mm}/${yyyy}`;
-  };
-
+  const formatPrintDate = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
   const labelLower = (originalLabel || '').toLowerCase().trim();
   if (labelLower === 'hôm nay') dateLabel = `Ngày ${formatPrintDate(today)}`;
   else if (labelLower === 'hôm qua') {
@@ -659,8 +655,7 @@ function printReport() {
   }
 
   if (type === 'product') {
-    let prodMap = {};
-    let grandQty = 0; let grandAmt = 0;
+    let prodMap = {}, grandQty = 0, grandAmt = 0;
     const gm = getGroupMap();
     allCompleted.forEach(o => {
       (o.items || []).forEach(item => {
@@ -668,13 +663,10 @@ function printReport() {
         let effectiveDate = (item.addDate && new Date(item.addDate).getTime() > new Date(o.realDate).getTime()) ? item.addDate : o.realDate;
         if (checkReportDate(effectiveDate)) {
           let pName = String(item.Ten_Hang).trim();
-          let sl = Number(item.SL || 0);
-          let gia = Number(item.Gia || 0);
-          let ck = Number(item.CK || 0);
+          let sl = Number(item.SL || 0), gia = Number(item.Gia || 0), ck = Number(item.CK || 0);
           let thTien = Math.round(sl * gia * (1 - ck / 100));
           if (!prodMap[pName]) prodMap[pName] = { SL: 0, TT: 0 };
-          prodMap[pName].SL += sl;
-          prodMap[pName].TT += thTien;
+          prodMap[pName].SL += sl; prodMap[pName].TT += thTien;
           grandQty += sl; grandAmt += thTien;
         }
       });
@@ -682,13 +674,9 @@ function printReport() {
 
     let prodArr = Object.keys(prodMap).map(k => {
       let tonKho = 0;
-      if (db.products) {
-        const p = db.products.find(x => String(x.Ten_San_Pham).trim() === k);
-        if (p) tonKho = Number(p.So_Luong || 0);
-      }
+      if (db.products) { const p = db.products.find(x => String(x.Ten_San_Pham).trim() === k); if (p) tonKho = Number(p.So_Luong || 0); }
       return { name: k, SL: prodMap[k].SL, TT: prodMap[k].TT, TonKho: tonKho };
-    });
-    prodArr.sort((a, b) => b.SL - a.SL);
+    }).sort((a, b) => b.SL - a.SL);
 
     html += `<div class="bc-header"><h2>BÁO CÁO SẢN PHẨM BÁN RA</h2><p>Thời gian: ${dateLabel}</p></div>
             <div class="bc-summary"><span>Tổng số lượng bán ra: <strong>${grandQty.toLocaleString()}</strong></span><span>Tổng tiền hàng: <strong>${grandAmt.toLocaleString()}đ</strong></span></div>
@@ -711,8 +699,7 @@ function printReport() {
     let totalRev = 0, saleStats = {};
     const revOrders = allCompleted.filter(o => checkReportDate(o.realDate));
     revOrders.forEach(o => {
-      let amt = Number(o.total || 0);
-      totalRev += amt;
+      let amt = Number(o.total || 0); totalRev += amt;
       let saleName = (o.sale || 'Không rõ').trim();
       if (!saleStats[saleName]) saleStats[saleName] = { count: 0, total: 0 };
       saleStats[saleName].count += 1; saleStats[saleName].total += amt;
@@ -877,7 +864,7 @@ function renderHistoryUI(){
     if(d===yesterStr)return"Hôm qua";
     return d;
   };
-  const role=(user.role||'').toLowerCase();
+  const isAdmin = isAdminRole();
 
   db.history.forEach(i=>{
     if(histPersonalOnly&&i.sale!==user.fullName)return;
@@ -915,7 +902,6 @@ function renderHistoryUI(){
     return b.realDate - a.realDate;
   });
 
-  // Phân trang 20 đơn / trang (áp dụng cho cả chế độ lọc Tất cả lẫn lọc trạng thái/ngày)
   const histTotalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
   if (currentHistoryPage > histTotalPages) currentHistoryPage = 1;
   if (currentHistoryPage < 1) currentHistoryPage = 1;
@@ -947,12 +933,15 @@ function renderHistoryUI(){
       bc = i.status === 'Đã in' ? 'done' : 'wait';
       badge = `<span class="badge-s ${bc === 'done' ? 'bdone' : 'bwait'}">${i.status}</span>`;
       
-      if(role==='admin' || ((role==='sale'||role==='leader') && isOwner)){
+      // Sale & Leader chỉ được sửa đơn của chính mình khi đang Chờ in, KHÔNG có nút In Nháp
+      if(!isAdmin && isOwner && i.status === 'Chờ in'){
+        actions='<button type="button" class="btn2 btn-warn btn-sm2" onclick="event.stopPropagation();editOrder(\''+i.id+'\')">✏️ Sửa</button>';
+      }
+      // Chỉ Admin mới có Sửa đơn mọi trạng thái, In Nháp và Đã Gộp
+      if(isAdmin){
         actions='<button type="button" class="btn2 btn-warn btn-sm2" onclick="event.stopPropagation();editOrder(\''+i.id+'\')">✏️ Sửa</button>'+
-                '<button type="button" class="btn2 btn-pri btn-sm2" onclick="event.stopPropagation();printPhieuXuatKho(\''+i.id+'\')">🖨️ In Nháp</button>';
-        if (role === 'admin') {
-          actions += '<button type="button" class="btn2 btn-sm2" style="background:#0e9f6e;color:#fff;border:none" onclick="event.stopPropagation();markAsProcessedOnly(\''+i.id+'\')">✔️ Đã Gộp</button>';
-        }
+                '<button type="button" class="btn2 btn-pri btn-sm2" onclick="event.stopPropagation();printPhieuXuatKho(\''+i.id+'\')">🖨️ In Nháp</button>'+
+                '<button type="button" class="btn2 btn-sm2" style="background:#0e9f6e;color:#fff;border:none" onclick="event.stopPropagation();markAsProcessedOnly(\''+i.id+'\')">✔️ Đã Gộp</button>';
       }
     }
 
@@ -1013,6 +1002,7 @@ function renderHistoryUI(){
 }
 
 function markAsProcessedOnly(id) {
+  if (!isAdminRole()) return;
   appConfirm("Đánh dấu toa này là 'Đã Gộp'?\n\nHệ thống sẽ chuyển nó sang 'Hoàn thành' để dọn dẹp danh sách chờ, nhưng KHÔNG cộng thêm doanh thu hay làm thay đổi báo cáo của toa gốc.", () => {
     if(db.history) { const h = db.history.find(x => x.id === id); if(h) h.status = 'Hoàn thành'; }
     if(db.historyForXuLy) { const hx = db.historyForXuLy.find(x => x.id === id); if(hx) hx.status = 'Hoàn thành'; }
@@ -1074,9 +1064,6 @@ function xlGetFilteredOrders(orders) {
   });
 }
 
-// ==========================================
-// XUẤT EXCEL CHI TIẾT HÓA ĐƠN CỦA 1 CỬA HÀNG
-// ==========================================
 function exportStoreDetailExcel(storeName) {
   let storeData = storeReportData.find(s => s.name === storeName);
   if (!storeData || !storeData.orders.length) {
@@ -1128,7 +1115,6 @@ function exportStoreDetailExcel(storeName) {
   if (typeof appToast === 'function') appToast("Đã xuất Excel thành công!");
 }
 
-// --- LỌC SẢN PHẨM TRONG CHI TIẾT CỬA HÀNG ---
 function buildStoreDetailTableHTML(orders, startIndex) {
   if (!orders || orders.length === 0) {
     return `<div class="empty"><div class="empty-icon">🧾</div><div class="empty-title">Không có hóa đơn nào phù hợp.</div></div>`;
@@ -1185,3 +1171,89 @@ function updateStoreDetailView(storeName) {
       return order.items.some(item => bodau(item.Ten_Hang || "").includes(bodau(currentStoreDetailProductFilter)));
     });
   }
+
+  const totalItems = filteredOrders.length;
+  const totalPages = Math.ceil(totalItems / STORE_ITEMS_PER_PAGE);
+  const startIndex = (currentStoreDetailPage - 1) * STORE_ITEMS_PER_PAGE;
+  const pagedOrders = filteredOrders.slice(startIndex, startIndex + STORE_ITEMS_PER_PAGE);
+
+  const tableWrapper = document.getElementById('storeDetailTableWrapper');
+  if (tableWrapper) tableWrapper.innerHTML = buildStoreDetailTableHTML(pagedOrders, startIndex);
+
+  const paginationWrapper = document.getElementById('storeDetailPaginationWrapper');
+  if (paginationWrapper) paginationWrapper.innerHTML = buildPagination(totalPages, currentStoreDetailPage, 'changeStoreDetailPage');
+}
+
+function suggestStoreDetailProduct(inputEl) {
+  const keyword = inputEl.value.trim().toLowerCase();
+  const suggestBox = document.getElementById('storeDetailProductSuggest');
+  
+  if (!keyword || !db.products || db.products.length === 0) {
+    suggestBox.style.display = 'none';
+    suggestBox.innerHTML = '';
+    if (keyword === "") filterStoreDetailOrders(currentDetailStoreName);
+    return;
+  }
+
+  const cleanKeyword = bodau(keyword);
+  const matchedProducts = db.products.filter(p => {
+    return bodau(p.Ten_San_Pham).includes(cleanKeyword) || (p.Ma_SP && bodau(p.Ma_SP).includes(cleanKeyword));
+  }).slice(0, 10);
+
+  if (matchedProducts.length === 0) {
+    suggestBox.innerHTML = '<div style="padding:10px 12px; color:var(--muted); font-size:12px; font-style:italic;">Không tìm thấy sản phẩm...</div>';
+    suggestBox.style.display = 'block';
+    return;
+  }
+
+  suggestBox.innerHTML = matchedProducts.map(p => {
+    const safeName = String(p.Ten_San_Pham).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    return `
+      <div onclick="selectStoreDetailProduct('${safeName}')" 
+           style="padding:10px 12px; border-bottom:1px solid var(--bdr); cursor:pointer; font-size:13px; font-weight:600; color:var(--pri);">
+        ${p.Ten_San_Pham} ${p.Ma_SP ? `<span style="color:var(--muted); font-size:11px; font-weight:normal;">(${p.Ma_SP})</span>` : ''}
+      </div>
+    `;
+  }).join('');
+  suggestBox.style.display = 'block';
+}
+
+function selectStoreDetailProduct(productName) {
+  const inputEl = document.getElementById('storeDetailProductSearch');
+  const suggestBox = document.getElementById('storeDetailProductSuggest');
+  if (inputEl) inputEl.value = productName;
+  if (suggestBox) suggestBox.style.display = 'none';
+  filterStoreDetailOrders(currentDetailStoreName);
+}
+
+document.addEventListener('click', function(event) {
+  const suggestBox = document.getElementById('storeDetailProductSuggest');
+  const searchInput = document.getElementById('storeDetailProductSearch');
+  if (suggestBox && suggestBox.style.display === 'block') {
+    if (!searchInput.contains(event.target) && !suggestBox.contains(event.target)) {
+      suggestBox.style.display = 'none';
+    }
+  }
+});
+
+let reportGroup = 'all';
+
+function setReportGroup(g, btn) {
+  reportGroup = g;
+  document.querySelectorAll('.r-grpbtn').forEach(b => b.classList.remove('act'));
+  btn.classList.add('act');
+  renderReport();
+}
+
+function getGroupMap() {
+  const m = {};
+  (db.products || []).forEach(p => { m[bodau(p.Ten_San_Pham)] = bodau(p.Nhom || ''); });
+  return m;
+}
+function itemInReportGroup(tenHang, gm) {
+  if (reportGroup === 'all') return true;
+  return gm[bodau(tenHang)] === bodau(reportGroup);
+}
+function getReportGroupLabel() {
+  return reportGroup === 'all' ? '' : ' - ' + reportGroup;
+}
