@@ -40,10 +40,19 @@ let histPersonalOnly=false;
 let xlFilter='all', xlCurrentId=null, xlEditItems={};
 let shDateMode='all';
 let xlGlobalCK={};
-let xlFinEditMode={}; // Lưu trạng thái đang sửa đơn hoàn thành
+let xlFinEditMode={};
 let reportDateMode='today';
 const ITEMS_PER_PAGE=20;
 window.localPrintedIds=window.localPrintedIds||[];
+
+function isStaffOrLeaderRole() {
+  const r = (user.role || '').toLowerCase().trim();
+  return r === 'sale' || r === 'leader';
+}
+
+function isAdminRole() {
+  return (user.role || '').toLowerCase().trim() === 'admin';
+}
 
 function buildGenericPagination(page, totalPages, totalCount, onPageFnName, targetId) {
   if (totalPages <= 1) return '';
@@ -67,7 +76,7 @@ function buildGenericPagination(page, totalPages, totalCount, onPageFnName, targ
 }
 
 // ==========================================
-// HÀM LỘT DẤU TIẾNG VIỆT (DÙNG CHUNG CHO TOÀN BỘ GIAO DIỆN)
+// HÀM LỘT DẤU TIẾNG VIỆT
 // ==========================================
 function bodau(str) {
   if (str === null || str === undefined) return '';
@@ -107,8 +116,8 @@ window.addEventListener('click', function(e) {
   if (!e.target.matches('.admin-menu-btn') && !e.target.closest('.admin-menu-btn')) closeAllAdminDropdowns();
 });
 
-// CÀI ĐẶT ON/OFF TỒN KHO
 function toggleStrictStock(el) {
+  if (!isAdminRole()) return;
   const isStrict = el.checked;
   el.disabled = true;
   google.script.run.withSuccessHandler(()=>{
@@ -153,11 +162,10 @@ function _dbDel(key) {
   }));
 }
 
-// ── Khởi động app ──────────────────────────────────
 window.onload = function() {
   initQuickProdForm();
 
-  if (AUTO_U && AUTO_P) {
+  if (typeof AUTO_U !== 'undefined' && typeof AUTO_P !== 'undefined' && AUTO_U && AUTO_P) {
     document.getElementById('u').value = AUTO_U;
     document.getElementById('p').value = AUTO_P;
     setTimeout(login, 100);
@@ -236,24 +244,18 @@ const SADMIN_IDS = ["admin","ketoanad","kimxuyen"];
 
 function changeStaffRole(id,cr){
   const isSadmin = (user.userId && SADMIN_IDS.includes(user.userId.toLowerCase()));
-  
   if(!isSadmin && (cr||'').toLowerCase() === 'admin'){
      alert("Không thể thay đổi quyền của Admin nếu bạn không phải SAdmin!");
      return;
   }
-  
   const promptText = isSadmin ? "Nhập quyền mới (Sale, Leader, hoặc Admin):" : "Nhập quyền mới (Sale hoặc Leader):";
   const nr = prompt(promptText, cr);
-  
   if(nr){
     const r = nr.trim().toLowerCase();
     const allowedRoles = isSadmin ? ['sale', 'leader', 'admin'] : ['sale', 'leader'];
-    
     if(allowedRoles.includes(r)){
        const displayRole = r === 'sale' ? 'Sale' : (r === 'leader' ? 'Leader' : 'Admin');
-       google.script.run.withSuccessHandler(()=>{
-           alert("Đã cập nhật!"); loadData();
-       }).updateStaffRole(id, displayRole);
+       google.script.run.withSuccessHandler(()=>{ alert("Đã cập nhật!"); loadData(); }).updateStaffRole(id, displayRole);
     } else { 
        alert("Quyền không hợp lệ hoặc bạn không có quyền cấp chức vụ này!");
     }
@@ -270,7 +272,7 @@ function setupUI(){
   document.getElementById('userDisplay').textContent=user.fullName+" ("+user.role+")";
   document.getElementById('sbUserInfo').textContent=user.fullName+" • "+user.role;
   
-  const role = (user.role || '').toLowerCase();
+  const role = (user.role || '').toLowerCase().trim();
   const isAdmin = (role === 'admin');
   const isLeader = (role === 'leader');
   
@@ -307,27 +309,21 @@ function setupUI(){
   loadData(); 
   loadHist(); 
   updateDraftBadge(); 
-
-  if (isAdmin) {
-    startPrintPolling();
-  }
 }
-
-let printPollingTimer = null;
-function startPrintPolling() {}
 
 // ==================== SHOW PAGE ====================
 function showPage(p, isBack = false){
   closeAllAdminDropdowns();
 
-  const role=(user.role||'').toLowerCase();
-  const adminOnly=['xulydh','import','importHistory','admin','thanhToan','lichSuThanhToan','baoHanh','lsBHKBD','searchCompleted'];
+  const role=(user.role||'').toLowerCase().trim();
+  const adminOnly=['xulydh','import','importHistory','admin','thanhToan','lichSuThanhToan','lichSuCongNo','baoHanh','lsBHKBD','baoHanhBD','lsBHBD','searchCompleted','searchImport'];
   if(adminOnly.includes(p)&&role!=='admin'){
     appAlert("Bạn không có quyền truy cập trang này!", "error");
     return;
   }
   if(p==='report' && role!=='admin' && role!=='leader'){
-     appAlert("Chỉ Leader và Admin mới được xem Báo Cáo!", "warning"); return;
+    appAlert("Chỉ Leader và Admin mới được xem Báo Cáo!", "warning");
+    return;
   }
 
   if (!isBack && p !== currentPageActive) {
@@ -350,42 +346,29 @@ function showPage(p, isBack = false){
   if(tabEl) tabEl.classList.add('active');
 
   if(p==='drafts') renderDraftsPage(); 
-  
-  if(p==='history') {
-    currentHistoryPage=1;
-    renderHistoryUI(); 
-    loadHist();        
-  }
-  if(p==='lichSuHoaDon') {
-    currentLshdPage=1;
-    if(db.history) renderLichSuHoaDon(); 
-    loadHist(); 
-  }
-  if(p==='thanhToan'){
+  if(p==='history') { currentHistoryPage=1; renderHistoryUI(); loadHist(); }
+  if(p==='lichSuHoaDon') { currentLshdPage=1; if(db.history) renderLichSuHoaDon(); loadHist(); }
+  if(p==='thanhToan' && role==='admin'){
     const si=document.getElementById('ttSearchInp');if(si)si.value='';
     const sr=document.getElementById('ttSearchRes');if(sr)sr.innerHTML='';
     const tr=document.getElementById('ttResult');if(tr)tr.style.display='none';
     const te=document.getElementById('ttEmpty');if(te)te.style.display='block';
     ttCurrentCust=null;
   }
-  if(p==='lichSuThanhToan'){
+  if(p==='lichSuThanhToan' && role==='admin'){
     const si=document.getElementById('lsttSearchGlobalInp'); if(si) si.value='';
     loadAllPaymentHistory();
   }
-  if(p==='lichSuCongNo'){currentCongNoPage=1;renderCongNoList();}
-  if(p==='xulydh') {
-    currentXuLyPage=1;
-    if(db.historyForXuLy) renderXuLyUI(); 
-    loadHistForXuLy(); 
-  }
-  if(p==='importHistory') loadImportHist();
+  if(p==='lichSuCongNo' && role==='admin'){currentCongNoPage=1;renderCongNoList();}
+  if(p==='xulydh' && role==='admin') { currentXuLyPage=1; if(db.historyForXuLy) renderXuLyUI(); loadHistForXuLy(); }
+  if(p==='importHistory' && role==='admin') loadImportHist();
   if(p==='customers'){currentCustPage=1;renderCustomerList();}
   if(p==='products'){currentProdPage=1;renderProductList();}
   if(p==='searchHistory') clearSearchHistory();
-  if(p === 'lsBHKBD') loadLsBHKBD();
-  if(p === 'lsBHBD') loadLsBHBD();
-  if(p === 'searchImport') initSearchImportPage();
-  if(p==='admin'){
+  if(p === 'lsBHKBD' && role==='admin') loadLsBHKBD();
+  if(p === 'lsBHBD' && role==='admin') loadLsBHBD();
+  if(p === 'searchImport' && role==='admin') initSearchImportPage();
+  if(p==='admin' && role==='admin'){
     renderStaffManagement();
     initQuickProdFields();
     const t = document.getElementById('strictStockToggle');
@@ -395,7 +378,7 @@ function showPage(p, isBack = false){
     updateExcludeBtnState();
   }
 
-  if (p === 'searchCompleted') {
+  if (p === 'searchCompleted' && role==='admin') {
     const searchInp = document.getElementById('inpSearchCompleted');
     if (searchInp) {
       searchInp.value = ''; 
@@ -404,7 +387,7 @@ function showPage(p, isBack = false){
       const summaryDiv = document.getElementById('completedSummary');
       if (summaryDiv) summaryDiv.style.display = 'none';
       if (typeof completedHistoryData !== 'undefined' && completedHistoryData.length === 0) {
-          if (typeof loadCompletedHistory === 'function') loadCompletedHistory();
+        if (typeof loadCompletedHistory === 'function') loadCompletedHistory();
       }
       setTimeout(() => { searchInp.focus(); }, 100);
     }
@@ -430,7 +413,6 @@ function logout(){
     document.getElementById('mainApp').style.display='none';document.getElementById('loginBox').style.display='block';
     user={};cart=[];closeSidebar();
     if (typeof removeMascot === 'function') removeMascot();
-    
     pageHistoryStack = []; 
     currentPageActive = 'order';
     const backBtn = document.getElementById('globalBackBtn');
@@ -452,13 +434,13 @@ function refreshCurrentData(btn){
       d.customers.map(c=>'<option value="'+c.Ten_Khach+'">').join('');
     if(document.getElementById('pCustomers').style.display!=='none') renderCustomerList();
     if(document.getElementById('pProducts').style.display!=='none') renderProductList();
-    if(document.getElementById('pAdmin').style.display!=='none'){
+    if(document.getElementById('pAdmin').style.display!=='none' && isAdminRole()){
       renderStaffManagement();
       const t=document.getElementById('strictStockToggle');
       if(t) t.checked=(db.strictStock!==false);
     }
-    if(document.getElementById('pLichSuCongNo').style.display!=='none') renderCongNoList();
-    if(document.getElementById('pThanhToan').style.display!=='none' && ttCurrentCust){
+    if(document.getElementById('pLichSuCongNo').style.display!=='none' && isAdminRole()) renderCongNoList();
+    if(document.getElementById('pThanhToan').style.display!=='none' && isAdminRole() && ttCurrentCust){
       selectThanhToanCust(ttCurrentCust.Ten_Khach);
     }
     done();
@@ -491,8 +473,8 @@ function refreshCurrentData(btn){
 
     renderAllHistoryPages();
 
-    if(document.getElementById('pLichSuThanhToan').style.display!=='none') loadAllPaymentHistory();
-    if(document.getElementById('pImportHistory').style.display!=='none') loadImportHist();
+    if(document.getElementById('pLichSuThanhToan').style.display!=='none' && isAdminRole()) loadAllPaymentHistory();
+    if(document.getElementById('pImportHistory').style.display!=='none' && isAdminRole()) loadImportHist();
     if(document.getElementById('pDrafts').style.display!=='none') renderDraftsPage();
     if(document.getElementById('pReport').style.display!=='none') renderReport();
 
@@ -559,15 +541,20 @@ function onCustChange(){
     addrEl.style.display='block';
     addrEl.innerHTML='📍 <strong>'+match.Ten_Khach+'</strong><br>'+selectedAddr+(match.SDT?'<br>📞 '+match.SDT:'');
     if(debtEl) {
-      if(selectedDebt < 0) debtEl.textContent = '⚠️ Âm: ' + selectedDebt.toLocaleString() + 'đ';
-      else debtEl.textContent = selectedDebt.toLocaleString() + 'đ';
+      if (isStaffOrLeaderRole()) {
+        debtEl.textContent = '—';
+      } else if(selectedDebt < 0) {
+        debtEl.textContent = '⚠️ Âm: ' + selectedDebt.toLocaleString() + 'đ';
+      } else {
+        debtEl.textContent = selectedDebt.toLocaleString() + 'đ';
+      }
     }
     if(sugg) sugg.style.display='none';
     return;
   }
 
   selectedAddr=""; selectedDebt=0; addrEl.style.display='none';
-  if(debtEl) debtEl.textContent='0đ';
+  if(debtEl) debtEl.textContent = isStaffOrLeaderRole() ? '—' : '0đ';
 
   if(!sugg) return;
   if(!v){ sugg.style.display='none'; return; }
@@ -697,11 +684,8 @@ function _renderDropdown(products, cartNames, isEmpty) {
 function _quickAdd(name, price, maxStock) {
   if (db.strictStock !== false && maxStock <= 0) { appAlert("Sản phẩm này đã hết hàng!", "error"); return; }
   if (cart.some(i => i.Ten_Hang === name)) { appToast("Sản phẩm này đã có trong giỏ!", "warning"); return; }
-  
   cart.unshift({ Ten_Hang: name, Gia: price, SL: 1, CK: '', Ghi_Chu: '', Ton_Kho: maxStock });
-  
   if (_msItems[name]) { delete _msItems[name]; }
-  
   document.getElementById('searchP').value = '';
   document.getElementById('resP').innerHTML = '';
   _removeFloatOK();
@@ -719,58 +703,24 @@ function _updateFloatOK(selectedCount) {
   btn.onclick = _msConfirm;
  
   btn.style.cssText = `
-    position: absolute !important;
-    right: 14px !important;
-    top: 10px !important;
-    z-index: 100 !important;
-    width: 50px !important;
-    height: 50px !important;
-    border-radius: 50% !important;
-    border: none !important;
-    cursor: pointer !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: linear-gradient(145deg, #2563eb, #1a40c0) !important;
-    color: #fff !important;
-    box-shadow: 0 4px 12px rgba(26,86,219,.45), 0 2px 4px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.25) !important;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 1px !important;
-    -webkit-tap-highlight-color: transparent !important;
-    transform: scale(1) !important;
-    transition: transform .15s, box-shadow .15s !important;
-    outline: none !important;
-    overflow: visible !important;
-    font-family: inherit !important;
+    position: absolute !important; right: 14px !important; top: 10px !important; z-index: 100 !important;
+    width: 50px !important; height: 50px !important; border-radius: 50% !important; border: none !important;
+    cursor: pointer !important; padding: 0 !important; margin: 0 !important;
+    background: linear-gradient(145deg, #2563eb, #1a40c0) !important; color: #fff !important;
+    box-shadow: 0 4px 12px rgba(26,86,219,.45), 0 2px 4px rgba(0,0,0,.2) !important;
+    display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important;
+    gap: 1px !important; outline: none !important; font-family: inherit !important;
   `;
  
   btn.innerHTML = `
-    <span style="
-      position:absolute;top:-4px;right:-4px;
-      background:#ef4444;color:#fff;
-      font-size:11px;font-weight:800;
-      min-width:20px;height:20px;
-      border-radius:10px;
-      display:flex;align-items:center;justify-content:center;
-      padding:0 4px;border:2px solid #fff;
-      box-shadow:0 2px 4px rgba(0,0,0,.2);
-      line-height:1;font-family:inherit;
-    ">${selectedCount}</span>
+    <span style="position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;font-size:11px;font-weight:800;min-width:20px;height:20px;border-radius:10px;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid #fff;line-height:1;">${selectedCount}</span>
     <span style="font-size:14px;font-weight:900;letter-spacing:-.5px;line-height:1;margin-top:2px">OK</span>
-    ${totalQty > 0
-      ? `<span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.85);line-height:1;background:rgba(0,0,0,.18);padding:1px 4px;border-radius:8px">${totalQty}</span>`
-      : ''}
+    ${totalQty > 0 ? `<span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.85);line-height:1;background:rgba(0,0,0,.18);padding:1px 4px;border-radius:8px">${totalQty}</span>` : ''}
   `;
  
   const orderCard = document.querySelector('#pOrder .card');
-  if (orderCard) {
-    orderCard.style.position = 'relative'; 
-    orderCard.appendChild(btn);
-  } else {
-    document.body.appendChild(btn);
-  }
+  if (orderCard) { orderCard.style.position = 'relative'; orderCard.appendChild(btn); }
+  else { document.body.appendChild(btn); }
 }
  
 function _removeFloatOK() {
@@ -781,7 +731,6 @@ function _removeFloatOK() {
 function _msToggle(name, price, maxStock) {
   if (db.strictStock !== false && maxStock <= 0) { appAlert("Sản phẩm này đã hết hàng!", "error"); return; }
   if (_msItems[name]) { delete _msItems[name]; } else { _msItems[name] = { price, maxStock, qty: '' }; }
- 
   const sn = cart.map(i => i.Ten_Hang);
   const v = document.getElementById('searchP').value.toLowerCase().trim();
   const f = (db.products || []).filter(p => p.Ten_San_Pham && p.Ten_San_Pham.toLowerCase().includes(v)).slice(0, 20);
@@ -794,57 +743,27 @@ function _msQty(input, name, maxStock) {
   const limit = (db.strictStock === false || maxStock <= 0) ? 999999 : maxStock;
   if (val !== '' && val > limit) { val = limit; input.value = limit; showStockAlert(name, limit); }
   if (_msItems[name]) _msItems[name].qty = val;
- 
-  const selectedCount = Object.keys(_msItems).length;
-  const totalQty = Object.values(_msItems).reduce((s, i) => s + (Number(i.qty) || 0), 0);
-  const btn = document.getElementById('msFloatOK');
-  if (btn) {
-    btn.innerHTML = `
-      <span style="
-        position:absolute;top:-4px;right:-4px;
-        background:#ef4444;color:#fff;
-        font-size:11px;font-weight:800;
-        min-width:20px;height:20px;
-        border-radius:10px;
-        display:flex;align-items:center;justify-content:center;
-        padding:0 4px;border:2px solid #fff;
-        box-shadow:0 2px 4px rgba(0,0,0,.2);
-        line-height:1;font-family:inherit;
-      ">${selectedCount}</span>
-      <span style="font-size:14px;font-weight:900;letter-spacing:-.5px;line-height:1;margin-top:2px">OK</span>
-      ${totalQty > 0
-        ? `<span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.85);line-height:1;background:rgba(0,0,0,.18);padding:1px 4px;border-radius:8px">${totalQty}</span>`
-        : ''}
-    `;
-  }
 }
  
 function _msConfirm() {
   const entries = Object.entries(_msItems);
   if (!entries.length) return;
- 
   const missing = entries.filter(([, v]) => v.qty === '' || Number(v.qty) <= 0);
   if (missing.length > 0) {
     appAlert("Chưa nhập số lượng cho:\n" + missing.map(([k]) => '• ' + k).join('\n'), "warning");
-    const inputs = document.querySelectorAll('.ms-qty');
-    const emptyInput = [...inputs].find(el => !el.value || Number(el.value) <= 0);
-    if (emptyInput) emptyInput.focus();
     return;
   }
- 
   let added = 0;
   [...entries].reverse().forEach(([name, info]) => {
     if (cart.some(i => i.Ten_Hang === name)) return;
     cart.unshift({ Ten_Hang: name, Gia: info.price, SL: Number(info.qty), CK: '', Ghi_Chu: '', Ton_Kho: info.maxStock });
     added++;
   });
- 
   _msItems = {};
   _removeFloatOK();
   document.getElementById('searchP').value = '';
   document.getElementById('resP').innerHTML = '';
   updateUI();
- 
   if (added === 0) appToast("Các sản phẩm đã có sẵn trong giỏ!", "info");
 }
 
@@ -857,7 +776,6 @@ function updateCartQty(idx, val){
     const prod = db.products.find(p=>p.Ten_San_Pham===item.Ten_Hang);
     if(prod) maxStock = Number(prod.So_Luong || 0);
   }
-  
   if(db.strictStock !== false && newQty !== "" && newQty > maxStock && maxStock > 0){
     newQty = maxStock;
     const inputs = document.querySelectorAll('.ci-inp-qty');
@@ -890,10 +808,12 @@ function removeFromCart(idx) {
   });
 }
 
+// Khi Sale/Leader đang sửa đơn của mình: khóa đổi tên sản phẩm, đơn giá, CK% — chỉ được chỉnh SL / Ghi chú / thêm-xóa món
 function updateUI(){
   let total=0;
   const hEl=document.getElementById('cartHeader'),tbEl=document.getElementById('totalBar');
-  
+  const lockProdSpecs = !!editingOrderId && isStaffOrLeaderRole();
+
   const btnSaveDraft = document.getElementById('btnSaveDraft');
   if(btnSaveDraft) btnSaveDraft.style.display = (cart.length > 0 && !editingOrderId) ? 'inline-flex' : 'none';
 
@@ -904,6 +824,8 @@ function updateUI(){
     const inputMax = db.strictStock === false ? 999999 : maxStock;
 
     item.Thanh_Tien=(Number(item.SL)||0)*item.Gia*(1-(Number(item.CK)||0)/100);total+=item.Thanh_Tien;
+    const lockedAttr = lockProdSpecs ? ' readonly disabled style="opacity:0.75;background:#f3f4f6;"' : '';
+
     return '<div class="cart-item">' +
       '<button class="ci-rm" style="position:absolute;right:10px;top:10px" onclick="removeFromCart('+idx+')">×</button>'+
       '<div class="ci-name">'+item.Ten_Hang+'</div>'+
@@ -914,8 +836,8 @@ function updateUI(){
       'style="touch-action:manipulation;padding:6px 2px;" placeholder="SL" '+
       'onchange="updateCartQty('+idx+',this.value)" '+
       'oninput="cart['+idx+'].SL=(this.value===\'\'?\'\':Math.min(parseInt(this.value)||0,'+inputMax+'));updateCartQtyDisplay('+idx+',this)">'+
-      '<input type="number" class="ci-inp" value="'+item.Gia+'" style="color:var(--dan);padding:6px 4px;" onchange="cart['+idx+'].Gia=Number(this.value)||0;updateUI()">'+
-      '<input type="number" class="ci-inp" value="'+(item.CK||'')+'" placeholder="%" style="color:var(--warn);padding:6px 2px;" onchange="cart['+idx+'].CK=Number(this.value)||0;updateUI()">'+
+      '<input type="number" class="ci-inp" value="'+item.Gia+'" style="color:var(--dan);padding:6px 4px;'+(lockProdSpecs?'opacity:0.75;background:#f3f4f6;':'')+'"'+lockedAttr+' onchange="if(!isStaffOrLeaderRole()||!editingOrderId){cart['+idx+'].Gia=Number(this.value)||0;updateUI();}">'+
+      '<input type="number" class="ci-inp" value="'+(item.CK||'')+'" placeholder="%" style="color:var(--warn);padding:6px 2px;'+(lockProdSpecs?'opacity:0.75;background:#f3f4f6;':'')+'"'+lockedAttr+' onchange="if(!isStaffOrLeaderRole()||!editingOrderId){cart['+idx+'].CK=Number(this.value)||0;updateUI();}">'+
       '<input type="text" class="ci-inp" id="ci-note-'+idx+'" style="color:var(--txt);font-weight:400;text-align:left" placeholder="Ghi chú..." value="'+String(item.Ghi_Chu||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')+'" onfocus="openNoteModal('+idx+',this)" onchange="cart['+idx+'].Ghi_Chu=this.value">'+
       '<span class="ci-price" id="ci-price-'+idx+'">'+Math.round(item.Thanh_Tien).toLocaleString()+'đ</span></div></div>';
   }).join('');
@@ -1014,17 +936,32 @@ function cancelEdit(){
   document.getElementById('btnCancelEdit').style.display='none';
 }
 
+// Khóa đổi tên khách hàng và giữ nguyên giá/CK gốc của sản phẩm khi Sale/Leader sửa đơn
 function submitOrder(){
   if(!cart.length||!document.getElementById('custInp').value){appAlert("Thiếu sản phẩm hoặc chưa chọn khách hàng!", "warning");return;}
   if(cart.some(i => i.SL === "" || i.SL <= 0)) { appAlert("Vui lòng điền số lượng lớn hơn 0 cho tất cả sản phẩm!", "warning"); return; }
 
   const btn=document.getElementById('btnSubmitOrder');btn.disabled=true;btn.textContent="Đang lưu...";
   if(editingOrderId){
+    const origOrder = (db.history||[]).find(x=>x.id===editingOrderId);
+    const custToSave = isStaffOrLeaderRole() && origOrder ? origOrder.cust : document.getElementById('custInp').value;
+    const itemsToSave = isStaffOrLeaderRole() && origOrder
+      ? cart.map(it => {
+          const oldIt = (origOrder.items||[]).find(oi => String(oi.Ten_Hang).trim() === String(it.Ten_Hang).trim());
+          const prod = (db.products||[]).find(p => String(p.Ten_San_Pham).trim() === String(it.Ten_Hang).trim());
+          return {
+            ...it,
+            Gia: oldIt ? oldIt.Gia : (prod ? prod.Don_Gia : it.Gia),
+            CK: oldIt ? oldIt.CK : ''
+          };
+        })
+      : cart;
+
     google.script.run.withSuccessHandler(()=>{appToast("Đã cập nhật toa thành công!");cancelEdit();loadHist();showPage('history');btn.disabled=false;})
-      .updateOrder(editingOrderId,{customer:document.getElementById('custInp').value,items:cart});
+      .updateOrder(editingOrderId,{customer:custToSave,items:itemsToSave});
   }else{
     const custName=document.getElementById('custInp').value;
-    const isAdmin=(user.role||'').toLowerCase()==='admin';
+    const isAdmin=isAdminRole();
     const saleNameToUse=(isAdmin && adminSelectedSale && adminSelectedSale.name) ? adminSelectedSale.name : user.fullName;
     google.script.run.withSuccessHandler(()=>{
       if(currentDraftId) {
@@ -1043,9 +980,8 @@ function submitOrder(){
 
 function editOrder(id){
   const o=(db.history||[]).find(x=>x.id===id);if(!o)return;
-  const role=(user.role||'').toLowerCase();
   const isOwner=String(o.sale||'').trim()===String(user.fullName||'').trim();
-  if(role!=='admin'){
+  if(!isAdminRole()){
     if(!isOwner){appAlert("Bạn chỉ có thể sửa đơn hàng của chính mình!", "error");return;}
     if(o.status!=='Chờ in'){appAlert("Chỉ có thể sửa đơn 'Chờ in'!\nĐang ở trạng thái: "+o.status, "warning");return;}
   }
@@ -1057,7 +993,10 @@ function editOrder(id){
       if(db.products){const prod=db.products.find(p=>p.Ten_San_Pham===item.Ten_Hang);if(prod)maxStock=Number(prod.So_Luong||0);}
       return {...item, Ton_Kho:maxStock};
     });
-    document.getElementById('custInp').value=o.cust;selectedAddr=o.addr||"";
+    const custInpEl = document.getElementById('custInp');
+    custInpEl.value=o.cust;
+    custInpEl.disabled = isStaffOrLeaderRole();
+    selectedAddr=o.addr||"";
     const addrEl=document.getElementById('addrDisplay');addrEl.style.display='block';
     addrEl.innerHTML='📍 <strong>'+o.cust+'</strong><br>'+selectedAddr;updateUI();
     const btn=document.getElementById('btnSubmitOrder');btn.textContent="Cập nhật toa "+id;btn.className='btn2 btn-warn btn-full';
@@ -1213,7 +1152,7 @@ function checkHistDate(orderDateMs) {
 
 function viewDetail(id){
   const o=(db.history||[]).find(x=>String(x.id).trim()===String(id).trim());if(!o)return;
-  const role=(user.role||'').toLowerCase();
+  const isAdmin = isAdminRole();
   document.getElementById('modalDynContent').innerHTML='';
   document.getElementById('orderHeaderDisplay').style.display='block';
   
@@ -1259,10 +1198,14 @@ function viewDetail(id){
   document.getElementById('detailAddr').textContent=addr||'Chưa có địa chỉ';
   const debtCont = document.getElementById('detailDebtContainer');
   if(debtCont) {
-    debtCont.style.display = 'block';
-    const debtDisplay = debt < 0 ? '⚠️ Âm: ' + debt.toLocaleString() + ' VNĐ' : (debt > 0 ? debt.toLocaleString() + ' VNĐ' : '0 VNĐ');
-    document.getElementById('detailDebt').textContent = debtDisplay;
-    document.getElementById('detailDebt').style.color = debt < 0 ? 'var(--suc)' : '';
+    if (!isAdmin) {
+      debtCont.style.display = 'none';
+    } else {
+      debtCont.style.display = 'block';
+      const debtDisplay = debt < 0 ? '⚠️ Âm: ' + debt.toLocaleString() + ' VNĐ' : (debt > 0 ? debt.toLocaleString() + ' VNĐ' : '0 VNĐ');
+      document.getElementById('detailDebt').textContent = debtDisplay;
+      document.getElementById('detailDebt').style.color = debt < 0 ? 'var(--suc)' : '';
+    }
   }
   
   document.getElementById('detailTableBody').innerHTML=(o.items||[]).map((it,i)=>{
@@ -1289,7 +1232,7 @@ function viewDetail(id){
   
   document.getElementById('detailTotal').textContent=Number(o.total).toLocaleString()+' VNĐ';
   let footer='<button type="button" class="btn2 btn-out" data-bs-dismiss="modal" onclick="restoreModalUI()">Đóng</button>';
-  if(role==='admin')footer+='<button type="button" class="btn2 btn-dng" onclick="deleteOrderAndClose(\''+o.id+'\')">Xóa đơn</button>';
+  if(isAdmin)footer+='<button type="button" class="btn2 btn-dng" onclick="deleteOrderAndClose(\''+o.id+'\')">Xóa đơn</button>';
   document.getElementById('detailFooter').innerHTML=footer;
   new bootstrap.Modal(document.getElementById('orderDetailModal')).show();
 }
@@ -1297,8 +1240,7 @@ function viewDetail(id){
 function viewDetailReadOnly(id){viewDetail(id);}
 
 function deleteOrderAndClose(id){
-  const role=(user.role||'').toLowerCase();
-  if(role!=='admin'){appAlert("Chỉ Admin mới có thể xóa đơn hàng!", "error");return;}
+  if(!isAdminRole()){appAlert("Chỉ Admin mới có thể xóa đơn hàng!", "error");return;}
   appConfirm("Xóa vĩnh viễn đơn "+id+"?", () => {
     bootstrap.Modal.getInstance(document.getElementById('orderDetailModal'))?.hide();
     google.script.run.withSuccessHandler(()=>loadHist()).deleteOrder(id);
@@ -1307,6 +1249,7 @@ function deleteOrderAndClose(id){
 
 // ===== XỬ LÝ ĐƠN HÀNG =====
 function loadHistForXuLy(){
+  if (!isAdminRole()) return;
   loadHist(); 
 }
 
@@ -1334,9 +1277,11 @@ function xlUpdateFilterBtns(){
 
 function renderAllHistoryPages() {
   updateXuLyBadge();
-  renderXuLyUI();
+  if (isAdminRole()) {
+    renderXuLyUI();
+    renderLichSuHoaDon();
+  }
   renderHistoryUI();
-  renderLichSuHoaDon();
   
   if(typeof renderReport === 'function' && document.getElementById('pReport') && document.getElementById('pReport').style.display !== 'none') {
     renderReport();
@@ -1344,8 +1289,9 @@ function renderAllHistoryPages() {
 }
 
 function renderXuLyUI(){
+  if (!isAdminRole()) return;
   const all = db.historyForXuLy || [];
-  const isAdmin = (user.role || '').toLowerCase() === 'admin';
+  const isAdmin = true;
   const daIn = all.filter(o => o.status === 'Đã in');
   const hoanThanh = all.filter(o => o.status === 'Hoàn thành');
   const huyToa = all.filter(o => o.status === 'Đã Hủy');
@@ -1526,15 +1472,18 @@ function goXuLyPage(p, elId) {
 }
 
 function openXlModal(id){
+  if (!isAdminRole()) { appAlert("Bạn không có quyền truy cập chức năng xử lý đơn!", "error"); return; }
   const all=db.historyForXuLy||[];
   const o=all.find(x=>x.id===id);if(!o)return;
   xlCurrentId=id;
 
-  if (o.status === 'Hoàn thành') {
-    xlEditItems[id] = o.items.map(i=>({Ten_Hang:i.Ten_Hang,SL:Number(i.SL)||1,Gia:Number(i.Gia)||0,CK:Number(i.CK)||0,Ghi_Chu:i.Ghi_Chu||''}));
-  } else {
-    xlEditItems[id] = o.items.map(i=>({Ten_Hang:i.Ten_Hang,SL:Number(i.SL)||1,Gia:Number(i.Gia)||0,CK:Number(i.CK)||0,Ghi_Chu:''}));
-  }
+  xlEditItems[id] = o.items.map(i=>({
+    Ten_Hang:i.Ten_Hang,
+    SL:Number(i.SL)||1,
+    Gia:Number(i.Gia)||0,
+    CK:Number(i.CK)||0,
+    Ghi_Chu: o.status === 'Hoàn thành' ? (i.Ghi_Chu||'') : ''
+  }));
 
   if(o.status==='Hoàn thành'){
     const rawCK = String(o.statusCK || o.ck || '0');
@@ -1557,11 +1506,11 @@ function closeXlModal(){
 function xlCalcItem(item){return Math.round(Number(item.SL||0)*Number(item.Gia||0)*(1-(Number(item.CK)||0)/100));}
 function xlCalcSubtotal(items){return items.reduce((s,i)=>s+xlCalcItem(i),0);}
 function xlCalcFinalTotal(items, gckAmt){
-  const sub = xlCalcSubtotal(items);
-  return Math.round(sub - (Number(gckAmt) || 0));
+  return Math.round(xlCalcSubtotal(items) - (Number(gckAmt) || 0));
 }
 
 function xlEnableFinEdit(id){
+  if (!isAdminRole()) return;
   xlFinEditMode[id] = true;
   const o = (db.historyForXuLy||[]).find(x=>x.id===id);
   if(!o) return;
@@ -1617,7 +1566,7 @@ function xlUpdatePrePaid(el, id) {
 }
 
 function renderXlModalContent(o){
-  const isAdmin = (user.role||'').toLowerCase() === 'admin';
+  const isAdmin = isAdminRole();
   const isFin = o.status === 'Hoàn thành';
   const isHuy = o.status === 'Đã Hủy';
   const isReadOnly = (isFin || isHuy) && !xlFinEditMode[o.id];
@@ -1627,7 +1576,6 @@ function renderXlModalContent(o){
   const prePaid = (typeof xlPrePaid !== 'undefined' && xlPrePaid[o.id] !== undefined) ? xlPrePaid[o.id] : Number(o.prePaid || 0);
   
   let pDebt = 0;
-  let pDebtBeforeThisOrder = 0;
 
   let titleText;
   if(isHuy) titleText = '❌ Xem hóa đơn đã hủy — ' + o.id;
@@ -1681,7 +1629,6 @@ function renderXlModalContent(o){
       ⚠️ THÔNG BÁO: ĐƠN HÀNG NÀY ĐÃ HỦY<br>Hệ thống đã tự động hoàn trả số lượng sản phẩm về kho và trừ công nợ cho khách hàng.
     </div>`;
   } else if(isFin && isReadOnly && isAdmin) body += '<div style="background:var(--fin-lt);border:1.5px solid var(--fin);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--fin);font-weight:600">✔ Đơn này đã hoàn thành — Bấm <strong>✏️ Sửa</strong> hoặc <strong>🗑️ Xóa</strong> ở dưới.</div>';
-  else if(isFin && isReadOnly && !isAdmin) body += '<div style="background:var(--fin-lt);border:1.5px solid var(--fin);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--fin);font-weight:600">✔ Đơn này đã hoàn thành — Chỉ xem.</div>';
   else if(isFin && !isReadOnly) body += '<div style="background:var(--warn-lt);border:1.5px solid var(--warn);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--warn);font-weight:600">✏️ Đang chỉnh sửa hóa đơn — Bấm <strong>Cập nhật & In</strong> để lưu.</div>';
   
   body += '<div style="margin-bottom:8px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Chi tiết sản phẩm ' + (isReadOnly ? '' : '<span style="color:var(--fin)">(có thể chỉnh sửa)</span>') + '</div>';
@@ -1710,15 +1657,10 @@ function renderXlModalContent(o){
   
   if(isFin || isHuy) {
     let noCuRaw = (o.noCu !== undefined) ? o.noCu : (o.oldDebt !== undefined ? o.oldDebt : 0);
-    pDebtBeforeThisOrder = Number(noCuRaw) || 0;
-    pDebt = pDebtBeforeThisOrder;
+    pDebt = Number(noCuRaw) || 0;
   } else if(db.customers) {
     const match = db.customers.find(c => bodau(c.Ten_Khach) === bodau(o.cust));
-    if(match) {
-      const currentDebt = Number(match.Cong_No || 0);
-      pDebt = currentDebt;
-      pDebtBeforeThisOrder = currentDebt;
-    }
+    if(match) pDebt = Number(match.Cong_No || 0);
   }
   
   if(!isReadOnly){
@@ -1734,11 +1676,10 @@ function renderXlModalContent(o){
   
   const debtColor = pDebt < 0 ? 'var(--suc)' : (pDebt > 0 ? 'var(--warn)' : 'var(--muted)');
   const debtLabel = pDebt < 0 ? '⚠️ DƯ / ÂM NỢ' : 'NỢ CŨ';
-  const debtNote = pDebt < 0 ? ' (kiểm tra lại dữ liệu)' : '';
   
   body += '<div class="gr" style="margin-top:5px; padding-top:5px; border-top:1px dashed rgba(0,0,0,0.1)">' +
           '<span class="glbl" style="color:' + debtColor + '; font-size:11px;">' + debtLabel + '</span>' +
-          '<span class="gamt" id="xlOldDebt_' + o.id + '" style="font-size:13px; color:' + debtColor + '" data-debt="'+pDebt+'">' + pDebt.toLocaleString() + 'đ' + debtNote + '</span></div>';
+          '<span class="gamt" id="xlOldDebt_' + o.id + '" style="font-size:13px; color:' + debtColor + '" data-debt="'+pDebt+'">' + pDebt.toLocaleString() + 'đ</span></div>';
           
   if(!isReadOnly) {
     body += '<div class="gr" style="margin-top:5px; padding-top:5px; border-top:1px dashed rgba(0,0,0,0.1)">' +
@@ -1773,23 +1714,24 @@ function renderXlModalContent(o){
   document.getElementById('xlModalBody').innerHTML = body;
 
   let foot = '<button class="btn2 btn-out" onclick="closeXlModal()">Đóng</button>';
-  if (!isHuy) {
-    if(isFin && isAdmin && isReadOnly) {
-        foot += '<button class="btn2 btn-out" onclick="xlPrintInvoiceOnly(\'' + o.id + '\')">🖨️ In lại</button>';
-        foot += '<button class="btn2" style="background-color: var(--dan); color: white; border: none;" onclick="handleAdminDeleteFromXlModal(\'' + o.id + '\')">🗑️ HUỶ TOA</button>';
-        foot += '<button class="btn2 btn-warn" onclick="xlEnableFinEdit(\'' + o.id + '\')">✏️ Sửa Hóa Đơn</button>';
-    } else if(isFin && isAdmin && !isReadOnly) {
-        foot += '<button class="btn2 btn-fin" onclick="xlUpdateAndPrintFin(\'' + o.id + '\')">🖨️ Cập nhật Hóa Đơn & In lại</button>';
+  if (!isHuy && isAdmin) {
+    if(isFin && isReadOnly) {
+      foot += '<button class="btn2 btn-out" onclick="xlPrintInvoiceOnly(\'' + o.id + '\')">🖨️ In lại</button>';
+      foot += '<button class="btn2" style="background-color: var(--dan); color: white; border: none;" onclick="handleAdminDeleteFromXlModal(\'' + o.id + '\')">🗑️ HUỶ TOA</button>';
+      foot += '<button class="btn2 btn-warn" onclick="xlEnableFinEdit(\'' + o.id + '\')">✏️ Sửa Hóa Đơn</button>';
+    } else if(isFin && !isReadOnly) {
+      foot += '<button class="btn2 btn-fin" onclick="xlUpdateAndPrintFin(\'' + o.id + '\')">🖨️ Cập nhật Hóa Đơn & In lại</button>';
     } else if (!isFin) {
-        foot += '<button class="btn2 btn-fin" onclick="xlPrintAndFinish(\'' + o.id + '\')">🖨️ In Hóa Đơn & Hoàn thành</button>';
+      foot += '<button class="btn2 btn-fin" onclick="xlPrintAndFinish(\'' + o.id + '\')">🖨️ In Hóa Đơn & Hoàn thành</button>';
     } else {
-        foot += '<button class="btn2 btn-out" onclick="xlPrintInvoiceOnly(\'' + o.id + '\')">🖨️ In lại hóa đơn</button>';
+      foot += '<button class="btn2 btn-out" onclick="xlPrintInvoiceOnly(\'' + o.id + '\')">🖨️ In lại hóa đơn</button>';
     }
   }
   document.getElementById('xlModalFoot').innerHTML = foot;
 }
 
 function handleAdminDeleteFromXlModal(orderId) {
+  if (!isAdminRole()) return;
   appConfirm("⚠️ CẢNH BÁO: Bạn có chắc muốn XÓA đơn " + orderId + "?", function() {
     Swal.fire({ title: 'Đang xử lý...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
 
@@ -1830,7 +1772,7 @@ function handleAdminDeleteFromXlModal(orderId) {
 }
 
 function changeOrderSale(id, newSaleName) {
-  if(!newSaleName) return;
+  if(!newSaleName || !isAdminRole()) return;
   if (db.historyForXuLy) { let o1 = db.historyForXuLy.find(x => x.id === id); if (o1) o1.sale = newSaleName; }
   if (db.history) { let o2 = db.history.find(x => x.id === id); if (o2) o2.sale = newSaleName; }
   google.script.run
@@ -1843,7 +1785,7 @@ function xlSearchProduct(val, orderId) {
   const resEl = document.getElementById('xlSearchRes_'+orderId);
   if(!val) { resEl.style.display='none'; return; }
   const term = val.toLowerCase();
-  const isAdmin = (user.role||'').toLowerCase() === 'admin';
+  const isAdmin = isAdminRole();
   const existNames = (xlEditItems[orderId]||[]).map(i=>i.Ten_Hang);
   const f = (db.products||[]).filter(p =>
     p.Ten_San_Pham && p.Ten_San_Pham.toLowerCase().includes(term) &&
@@ -1922,7 +1864,7 @@ function xlUpdateItem(el,orderId){
   if(ttEl) ttEl.textContent=tt.toLocaleString();
   
   let giaSauCK = Math.round(Number(items[idx].Gia||0) * (1 - (Number(items[idx].CK)||0)/100));
-  const gckEl = document.getElementById('xlgck_' + orderId + '_' + idx);
+  const gckEl = document.getElementById('xlgck_' + o.id + '_' + idx);
   if(gckEl) gckEl.textContent = giaSauCK.toLocaleString();
   
   const gck=xlGlobalCK[orderId]||0;
@@ -1986,10 +1928,7 @@ function addImportCart(n) {
   }, 50); 
 }
 
-function removeImportCart(idx) {
-  importCart.splice(idx, 1);
-  updateImportUI();
-}
+function removeImportCart(idx) { importCart.splice(idx, 1); updateImportUI(); }
 
 function updateImportUI() {
   const banner = editingImportId
@@ -2016,6 +1955,7 @@ function updateImportUI() {
 }
 
 function submitImport(){
+  if (!isAdminRole()) return;
   if(!importCart.length){appAlert("Chưa chọn sản phẩm nào!", "warning");return;}
   if(importCart.some(i => !Number(i.SL) || Number(i.SL) <= 0)){
     appAlert("Vui lòng nhập số lượng lớn hơn 0 cho tất cả sản phẩm!", "warning");
@@ -2043,6 +1983,7 @@ function submitImport(){
 }
 
 function editImport(id){
+  if (!isAdminRole()) return;
   const o=(db.importHistory||[]).find(x=>String(x.id)===String(id));
   if(!o) return;
   const proceed = () => {
@@ -2058,18 +1999,13 @@ function editImport(id){
   }
 }
 
-function cancelEditImport(){
-  editingImportId = null;
-  importCart = [];
-  updateImportUI();
-}
+function cancelEditImport(){ editingImportId = null; importCart = []; updateImportUI(); }
 
 const IMPORT_PER_PAGE = 20;
 let currentImportPage = 1;
 let importHistoryData = [];
 function loadImportHist() {
-  const role = (user.role || '').toLowerCase();
-  if (role !== 'admin') return;
+  if (!isAdminRole()) return;
   google.script.run.withSuccessHandler(h => {
     db.importHistory = h;
     importHistoryData = h;
@@ -2109,10 +2045,9 @@ function buildImportPagination(page,totalPages,totalCount){
   if(totalPages<=1) return '';
   const btn=(label,p,opts)=>{
     opts=opts||{};
-    const active=opts.active, disabled=opts.disabled;
-    return '<button class="btn2 '+(active?'btn-pri':'btn-out')+' btn-sm2" '+
-      'style="min-width:36px;padding:4px 8px;'+(active?'font-weight:800;':'')+'" '+
-      (disabled?'disabled ':'onclick="goImportPage('+p+')" ')+'>'+label+'</button>';
+    return '<button class="btn2 '+(opts.active?'btn-pri':'btn-out')+' btn-sm2" '+
+      'style="min-width:36px;padding:4px 8px;'+(opts.active?'font-weight:800;':'')+'" '+
+      (opts.disabled?'disabled ':'onclick="goImportPage('+p+')" ')+'>'+label+'</button>';
   };
   const show=new Set([1,totalPages,page-2,page-1,page,page+1,page+2]);
   const pages=[...show].filter(p=>p>=1&&p<=totalPages).sort((a,b)=>a-b);
@@ -2145,41 +2080,17 @@ function viewImportDetail(id){
   document.getElementById('modalDynContent').innerHTML='<div style="background:var(--info-lt);border-radius:8px;padding:10px;margin-bottom:12px"><div style="font-weight:700;color:var(--info);font-size:14px">Mã phiếu: '+o.id+'</div><div style="font-size:12px;color:var(--muted);margin-top:3px">Thời gian: '+o.time+'</div><div style="font-size:12px;color:var(--muted)">Người nhập: <strong>'+o.user+'</strong></div></div>';
   
   const tbl = document.getElementById('orderTable');
-  tbl.style.display = 'table';
-  tbl.style.minWidth = '550px';
-  tbl.style.width = 'max-content';
-
+  tbl.style.display = 'table'; tbl.style.minWidth = '550px'; tbl.style.width = 'max-content';
   const wrapper = tbl.parentElement;
-  if (wrapper) {
-    wrapper.style.overflowX = 'auto';
-    wrapper.style.webkitOverflowScrolling = 'touch';
-    wrapper.style.maxWidth = '100%';
-  }
-
+  if (wrapper) { wrapper.style.overflowX = 'auto'; wrapper.style.webkitOverflowScrolling = 'touch'; wrapper.style.maxWidth = '100%'; }
   const thead = tbl.querySelector('thead');
   if(thead) {
-    thead.innerHTML = `<tr>
-      <th width="5%" style="text-align:center">#</th>
-      <th width="15%" style="text-align:center">Mã SP</th>
-      <th width="40%">Sản phẩm</th>
-      <th width="15%" style="text-align:center">Số lượng</th>
-      <th width="25%">Ghi chú</th>
-    </tr>`;
+    thead.innerHTML = `<tr><th width="5%" style="text-align:center">#</th><th width="15%" style="text-align:center">Mã SP</th><th width="40%">Sản phẩm</th><th width="15%" style="text-align:center">Số lượng</th><th width="25%">Ghi chú</th></tr>`;
   }
-
   document.getElementById('detailTableBody').innerHTML=o.items.map((i,idx)=>{
     let msp = '';
-    if(db.products){
-      let p = db.products.find(x => String(x.Ten_San_Pham).trim() === String(i.Ten_Hang).trim());
-      if(p) msp = p.Ma_SP || p['Mã SP'] || '';
-    }
-    return '<tr>' +
-      '<td style="color:var(--muted);text-align:center;">'+(idx+1)+'</td>' +
-      '<td style="font-weight:700;color:var(--info);text-align:center;white-space:nowrap;">'+msp+'</td>' +
-      '<td style="font-weight:700">'+i.Ten_Hang+'</td>' +
-      '<td style="text-align:center;font-weight:700;color:var(--pri)">'+i.SL+'</td>' +
-      '<td style="color:var(--muted);font-size:11px;">'+(i.note || '')+'</td>' +
-      '</tr>';
+    if(db.products){ let p = db.products.find(x => String(x.Ten_San_Pham).trim() === String(i.Ten_Hang).trim()); if(p) msp = p.Ma_SP || p['Mã SP'] || ''; }
+    return '<tr><td style="color:var(--muted);text-align:center;">'+(idx+1)+'</td><td style="font-weight:700;color:var(--info);text-align:center;white-space:nowrap;">'+msp+'</td><td style="font-weight:700">'+i.Ten_Hang+'</td><td style="text-align:center;font-weight:700;color:var(--pri)">'+i.SL+'</td><td style="color:var(--muted);font-size:11px;">'+(i.note || '')+'</td></tr>';
   }).join('');
   
   document.getElementById('detailFooter').innerHTML=
@@ -2193,9 +2104,7 @@ function restoreModalUI(){
   document.getElementById('orderHeaderDisplay').style.display='block';
   if(document.getElementById('detailDebtContainer')) document.getElementById('detailDebtContainer').style.display='block';
   const tbl = document.getElementById('orderTable');
-  tbl.style.display='table';
-  tbl.style.minWidth=''; 
-  tbl.classList.remove('force-scroll-table');
+  tbl.style.display='table'; tbl.style.minWidth=''; tbl.classList.remove('force-scroll-table');
   if(tbl.parentElement) tbl.parentElement.style.overflowX='';
   document.getElementById('totalTextLabel').textContent='TỔNG CỘNG';
   document.getElementById('modalDynContent').innerHTML='';
@@ -2338,6 +2247,7 @@ function _qpEsc(s) {
 }
 
 function initQuickProdFields() {
+  if (!isAdminRole()) return;
   google.script.run
     .withSuccessHandler(function (nextCode) { _nextMaSP = nextCode || 'SP0001'; renderQuickProdFields(); })
     .withFailureHandler(function () { _nextMaSP = _nextMaSP || 'SP0001'; renderQuickProdFields(); })
@@ -2406,6 +2316,7 @@ function removeQuickProd(idx) {
 }
 
 function saveQuickProducts() {
+  if (!isAdminRole()) return;
   const validList = quickProdList
     .filter(function (p) { return p.name && p.name.trim(); })
     .map(function (p) { return { name: p.name.trim(), price: p.price, msp: (p.msp || '').trim() }; });
@@ -2439,8 +2350,7 @@ function saveQuickProducts() {
 
 function renderStaffManagement(){
   const el=document.getElementById('staffListTable');if(!el||!db.staffs)return;
-  const role=(user.role||'').toLowerCase();
-  if(role!=='admin')return;
+  if(!isAdminRole())return;
   el.innerHTML=db.staffs.map(s=>{
     const rm={'admin':'background:var(--dan-lt);color:var(--dan)','leader':'background:var(--info-lt);color:var(--info)','sale':'background:var(--bg);color:var(--muted)'};
     const st=rm[(s.role||'').toLowerCase()]||rm.sale;
@@ -2450,6 +2360,7 @@ function renderStaffManagement(){
 }
 
 function addStaff(){
+  if (!isAdminRole()) return;
   const d={name:document.getElementById('adName').value,id:document.getElementById('adID').value,pass:document.getElementById('adPass').value,phone:document.getElementById('adPhone').value,role:document.getElementById('adRole').value};
   if(!d.name||!d.id||!d.pass){appAlert("Vui lòng điền đủ Tên, ID và Mật khẩu!", "warning");return;}
   google.script.run.withSuccessHandler(()=>{appToast("Đã thêm nhân viên!");['adName','adID','adPass','adPhone'].forEach(id=>document.getElementById(id).value='');loadData();}).addNewStaff(d);
@@ -2458,10 +2369,10 @@ function addStaff(){
 function changeStaffPass(id){const p=prompt("Mật khẩu mới cho "+id+":");if(p)google.script.run.withSuccessHandler(()=>appToast("Đã cập nhật mật khẩu!")).updateStaffPass(id,p);}
 function removeStaff(id){appConfirm("Xóa nhân viên "+id+"?", () => { google.script.run.withSuccessHandler(()=>loadData()).deleteStaff(id); });}
 
+// Danh sách khách hàng: Sale/Leader chỉ xem tên/SĐT/địa chỉ, không xem công nợ
 function renderCustomerList(){
   if(!db.customers)return;
-  const role=(user.role||'').toLowerCase();
-  const canEdit=(role==='admin');
+  const canEdit=isAdminRole();
   const term=document.getElementById('searchCustList').value.toLowerCase();
   const filtered=db.customers.filter(c=>c.Ten_Khach&&bodau(c.Ten_Khach.toString()).includes(bodau(term)));
   const total=Math.ceil(filtered.length/ITEMS_PER_PAGE);
@@ -2470,8 +2381,8 @@ function renderCustomerList(){
   if(currentCustPage>total&&total>0)currentCustPage=total;
   const page=filtered.slice((currentCustPage-1)*ITEMS_PER_PAGE,currentCustPage*ITEMS_PER_PAGE);
   
-  let html='<table class="dtbl"><thead><tr><th>#</th><th>Tên khách</th><th>SĐT</th><th>Địa chỉ</th><th style="text-align:right">Công nợ</th>'+(canEdit?'<th style="text-align:center">Thao tác</th>':'')+'</tr></thead><tbody>';
-  if(!page.length)html+='<tr><td colspan="'+(canEdit?6:5)+'" style="text-align:center;color:var(--muted);padding:20px">Không có dữ liệu</td></tr>';
+  let html='<table class="dtbl"><thead><tr><th>#</th><th>Tên khách</th><th>SĐT</th><th>Địa chỉ</th>'+(canEdit?'<th style="text-align:right">Công nợ</th><th style="text-align:center">Thao tác</th>':'')+'</tr></thead><tbody>';
+  if(!page.length)html+='<tr><td colspan="'+(canEdit?6:4)+'" style="text-align:center;color:var(--muted);padding:20px">Không có dữ liệu</td></tr>';
   else{
     const start=(currentCustPage-1)*ITEMS_PER_PAGE;
     page.forEach((c,i)=>{
@@ -2483,8 +2394,9 @@ function renderCustomerList(){
       const debtHtml = debt < 0 
         ? '<span style="color:#ef4444;font-weight:700">⚠️ ' + debt.toLocaleString() + 'đ</span>'
         : (debt > 0 ? '<span style="color:var(--warn);font-weight:700">' + debt.toLocaleString() + 'đ</span>' : '<span style="color:var(--muted)">0đ</span>');
-      const act=canEdit?'<td style="text-align:center"><button class="btn2 btn-out btn-sm2 me-1" onclick="editCustomer(\''+sn+'\',\''+sp+'\',\''+sa+'\')">✏️</button><button class="btn2 btn-sm2" style="background:var(--dan-lt);color:var(--dan);border:none" onclick="removeCustomer(\''+sn+'\')">❌</button></td>':'';
-      html+='<tr><td style="color:var(--muted)">'+(start+i+1)+'</td><td style="font-weight:700;color:var(--pri)">'+c.Ten_Khach+'</td><td style="font-weight:600">'+phone+'</td><td style="color:var(--muted);font-size:11px">'+c.Dia_Chi+'</td><td style="text-align:right">'+debtHtml+'</td>'+act+'</tr>';
+      const debtCol = canEdit ? '<td style="text-align:right">'+debtHtml+'</td>' : '';
+      const act = canEdit ? '<td style="text-align:center"><button class="btn2 btn-out btn-sm2 me-1" onclick="editCustomer(\''+sn+'\',\''+sp+'\',\''+sa+'\')">✏️</button><button class="btn2 btn-sm2" style="background:var(--dan-lt);color:var(--dan);border:none" onclick="removeCustomer(\''+sn+'\')">❌</button></td>' : '';
+      html+='<tr><td style="color:var(--muted)">'+(start+i+1)+'</td><td style="font-weight:700;color:var(--pri)">'+c.Ten_Khach+'</td><td style="font-weight:600">'+phone+'</td><td style="color:var(--muted);font-size:11px">'+c.Dia_Chi+'</td>'+debtCol+act+'</tr>';
     });
   }
   html+='</tbody></table>';
@@ -2493,8 +2405,7 @@ function renderCustomerList(){
 }
 
 function editCustomer(oldName,phone,addr){
-  const role=(user.role||'').toLowerCase();
-  if(role!=='admin'){appAlert("Chỉ Admin mới có thể sửa thông tin khách hàng!", "error");return;}
+  if(!isAdminRole()){appAlert("Chỉ Admin mới có thể sửa thông tin khách hàng!", "error");return;}
   const n=prompt("Sửa tên:",oldName);if(n===null||!n.trim())return;
   const p=prompt("Sửa SĐT:",phone);if(p===null)return;
   const a=prompt("Sửa địa chỉ:",addr);if(a===null||!a.trim())return;
@@ -2502,8 +2413,7 @@ function editCustomer(oldName,phone,addr){
 }
 
 function removeCustomer(name){
-  const role=(user.role||'').toLowerCase();
-  if(role!=='admin'){appAlert("Chỉ Admin mới có thể xóa khách hàng!", "error");return;}
+  if(!isAdminRole()){appAlert("Chỉ Admin mới có thể xóa khách hàng!", "error");return;}
   appConfirm("Xóa khách hàng: "+name+"?", () => { google.script.run.withSuccessHandler(()=>{appToast("Đã xóa!");loadData();renderCustomerList();}).deleteCustomer(name); });
 }
 
@@ -2541,7 +2451,7 @@ function _renderProdTable(list) {
   if (currentProdPage < 1) currentProdPage = 1;
   const start = (currentProdPage - 1) * ITEMS_PER_PAGE;
   const pageList = list.slice(start, start + ITEMS_PER_PAGE);
-  const isAdmin = (user.role || '').toLowerCase() === 'admin';
+  const isAdmin = isAdminRole();
 
   tbody.innerHTML = pageList.map((p, idx) => {
     const stk = Number(p.So_Luong || 0);
@@ -2594,6 +2504,7 @@ function goProdPage(p, elId) {
 }
 
 function openEditProd(maSP, ten, gia, tonKho) {
+  if (!isAdminRole()) { appAlert("Bạn không có quyền sửa sản phẩm!", "error"); return; }
   document.getElementById('editProdOldMaSP').value = maSP;
   document.getElementById('editProdMaSP').value = maSP;
   document.getElementById('editProdName').value = ten;
@@ -2603,6 +2514,7 @@ function openEditProd(maSP, ten, gia, tonKho) {
 }
 
 function saveEditProduct() {
+  if (!isAdminRole()) return;
   const oldMaSP = document.getElementById('editProdOldMaSP').value;
   const newMaSP = document.getElementById('editProdMaSP').value.trim();
   const name  = document.getElementById('editProdName').value.trim();
@@ -2626,6 +2538,7 @@ function saveEditProduct() {
 }
 
 function confirmDeleteProduct(maSP, ten, btn) {
+  if (!isAdminRole()) return;
   appConfirm(`Xóa vĩnh viễn sản phẩm "${ten}"?`, () => {
     btn.disabled = true;
     google.script.run
@@ -2700,6 +2613,7 @@ function checkLshdDate(timeMs) {
 }
 
 function renderLichSuHoaDon(){
+  if (!isAdminRole()) return;
   const custFilter = document.getElementById('lshd_custFilter') ? document.getElementById('lshd_custFilter').value.toLowerCase().trim() : '';
   const el=document.getElementById('lshdList');
   const role=(user.role||'').toLowerCase();
@@ -2805,34 +2719,21 @@ function goLshdPage(p, elId) {
 }
 
 function viewLichSuHoaDonDetail(id){
+  if (!isAdminRole()) return;
   const o = (db.historyHoanThanh||[]).find(x=>String(x.id).trim()===String(id).trim());if(!o)return;
   document.getElementById('modalTitle').textContent='Hóa Đơn Hoàn Thành';
   document.getElementById('orderHeaderDisplay').style.display='block';
   
   const tbl = document.getElementById('orderTable');
-  tbl.style.display='table';
-  tbl.style.width='100%';
-  tbl.style.tableLayout='fixed';
-  tbl.style.minWidth='900px'; 
+  tbl.style.display='table'; tbl.style.width='100%'; tbl.style.tableLayout='fixed'; tbl.style.minWidth='900px'; 
   tbl.classList.add('force-scroll-table');
-  
   const wrap = tbl.parentElement;
   if(wrap && !wrap.classList.contains('table-responsive')) wrap.classList.add('table-responsive');
   wrap.style.overflowX='auto'; 
   
   const thead = tbl.querySelector('thead');
   if(thead) {
-    thead.innerHTML = `<tr>
-      <th width="4%">#</th>
-      <th width="8%" style="text-align:center">Mã SP</th>
-      <th width="25%">Sản phẩm</th>
-      <th width="8%" style="text-align:center">SL</th>
-      <th width="12%" style="text-align:right">Giá</th>
-      <th width="5%" style="text-align:center">CK%</th>
-      <th width="12%" style="text-align:right;color:var(--info)">Giá sau CK</th>
-      <th width="14%" style="text-align:right">T.Tiền</th>
-      <th width="22%">Ghi chú</th>
-    </tr>`;
+    thead.innerHTML = `<tr><th width="4%">#</th><th width="8%" style="text-align:center">Mã SP</th><th width="25%">Sản phẩm</th><th width="8%" style="text-align:center">SL</th><th width="12%" style="text-align:right">Giá</th><th width="5%" style="text-align:center">CK%</th><th width="12%" style="text-align:right;color:var(--info)">Giá sau CK</th><th width="14%" style="text-align:right">T.Tiền</th><th width="22%">Ghi chú</th></tr>`;
   }
 
   document.getElementById('detailId').textContent=o.id;
@@ -2877,44 +2778,16 @@ function viewLichSuHoaDonDetail(id){
 
   document.getElementById('detailTableBody').innerHTML=(o.items||[]).map((it,i)=>{
     let msp = '';
-    if(db.products){
-      let p = db.products.find(x => String(x.Ten_San_Pham).trim() === String(it.Ten_Hang).trim());
-      if(p) msp = p.Ma_SP || p['Mã SP'] || '';
-    }
+    if(db.products){ let p = db.products.find(x => String(x.Ten_San_Pham).trim() === String(it.Ten_Hang).trim()); if(p) msp = p.Ma_SP || p['Mã SP'] || ''; }
     let giaSauCK = Math.round(Number(it.Gia) * (1 - (Number(it.CK)||0)/100));
     let thanhTien = Math.round(Number(it.SL) * giaSauCK);
     
-    return '<tr>'+
-      '<td style="color:var(--muted);text-align:center;">'+(i+1)+'</td>'+
-      '<td style="font-weight:700;color:var(--info);text-align:center;white-space:nowrap;">'+msp+'</td>'+
-      '<td style="font-weight:700;overflow-wrap:break-word;word-break:break-word">'+it.Ten_Hang+'</td>'+
-      '<td style="text-align:center;font-weight:700;color:var(--pri)">'+it.SL+'</td>'+
-      '<td style="text-align:right">'+Number(it.Gia).toLocaleString()+'</td>'+
-      '<td style="text-align:center;font-weight:700;color:var(--warn)">'+(it.CK||0)+'%</td>'+
-      '<td style="text-align:right;color:var(--info)">'+giaSauCK.toLocaleString()+'</td>'+
-      '<td style="text-align:right;font-weight:700;color:var(--dan)">'+thanhTien.toLocaleString()+'</td>'+
-      '<td style="color:var(--muted);font-size:11px;overflow-wrap:break-word">'+(it.Ghi_Chu||'—')+'</td>'+
-      '</tr>';
+    return '<tr><td style="color:var(--muted);text-align:center;">'+(i+1)+'</td><td style="font-weight:700;color:var(--info);text-align:center;white-space:nowrap;">'+msp+'</td><td style="font-weight:700;overflow-wrap:break-word;word-break:break-word">'+it.Ten_Hang+'</td><td style="text-align:center;font-weight:700;color:var(--pri)">'+it.SL+'</td><td style="text-align:right">'+Number(it.Gia).toLocaleString()+'</td><td style="text-align:center;font-weight:700;color:var(--warn)">'+(it.CK||0)+'%</td><td style="text-align:right;color:var(--info)">'+giaSauCK.toLocaleString()+'</td><td style="text-align:right;font-weight:700;color:var(--dan)">'+thanhTien.toLocaleString()+'</td><td style="color:var(--muted);font-size:11px;overflow-wrap:break-word">'+(it.Ghi_Chu||'—')+'</td></tr>';
   }).join('');
   
-  const mobileScrollCss = `
-    <style>
-      @media screen and (max-width: 768px) {
-        table#orderTable.force-scroll-table th:nth-child(2),
-        table#orderTable.force-scroll-table td:nth-child(2),
-        table#orderTable.force-scroll-table th:nth-child(6),
-        table#orderTable.force-scroll-table td:nth-child(6),
-        table#orderTable.force-scroll-table th:nth-child(7),
-        table#orderTable.force-scroll-table td:nth-child(7) { display: table-cell !important; }
-        .table-responsive:has(.force-scroll-table) { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
-        table#orderTable.force-scroll-table { width: 900px !important; max-width: none !important; }
-      }
-    </style>
-  `;
-
   const orderNoteDisplay = (o.note || '').trim().replace(/\n/g, '<br>') || '<span style="color:var(--muted); font-style:italic;">Không có ghi chú</span>';
 
-  document.getElementById('modalDynContent').innerHTML = mobileScrollCss +
+  document.getElementById('modalDynContent').innerHTML =
     '<div style="background:var(--bg); border:1px solid var(--bdr); border-radius:8px; padding:10px 12px; margin-bottom:12px;">' +
       '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;"><span style="font-weight:600; color:var(--muted); font-size:12px;">💰 TỔNG TIỀN HÀNG:</span><span style="font-weight:800; color:var(--txt); font-size:14px;">' + orderTotal.toLocaleString() + 'đ</span></div>' +
       '<div style="display:flex; justify-content:space-between; align-items:center; padding-top:6px; border-top:1px dashed var(--bdr); margin-bottom:6px;"><span style="font-weight:700; color:var(--pri); font-size:12px;">💵 KHÁCH THANH TOÁN TRƯỚC:</span><span style="font-weight:800; color:var(--pri); font-size:15px;">-' + prePaid.toLocaleString() + 'đ</span></div>' +
@@ -2927,10 +2800,11 @@ function viewLichSuHoaDonDetail(id){
   new bootstrap.Modal(document.getElementById('orderDetailModal')).show();
 }
 
-// ===== THANH TOÁN CÔNG NỢ =====
+// ===== THANH TOÁN CÔNG NỢ (CHỈ ADMIN) =====
 let ttCurrentCust = null;
 
 function searchThanhToan(){
+  if (!isAdminRole()) return;
   const v=(document.getElementById('ttSearchInp').value||'').toLowerCase().trim();
   const res=document.getElementById('ttSearchRes');
   document.getElementById('ttResult').style.display='none';
@@ -2946,6 +2820,7 @@ function searchThanhToan(){
 }
 
 function selectThanhToanCust(name){
+  if (!isAdminRole()) return;
   document.getElementById('ttSearchInp').value=name;
   document.getElementById('ttSearchRes').innerHTML='';
   const m=(db.customers||[]).find(c=>bodau(String(c.Ten_Khach||'').trim())===bodau(String(name||'').trim()));
@@ -3004,7 +2879,7 @@ function _renderDebtBox(debt, payAmt){
 }
 
 function editCongNoSAdmin() {
-  if(!ttCurrentCust) return;
+  if(!ttCurrentCust || !isAdminRole()) return;
   const isSadmin = (user.userId && SADMIN_IDS.includes(user.userId.toLowerCase())) || (user.fullName && user.fullName.toLowerCase() === "mr phong".toLowerCase());
   if (!isSadmin) { appAlert("Chỉ SAdmin mới có quyền sửa công nợ trực tiếp!", "error"); return; }
   const currentDebt = Number(ttCurrentCust.Cong_No || 0);
@@ -3044,27 +2919,16 @@ function editCongNoSAdmin() {
   });
 }
 
-function updatePaymentPreview(){
-  if(!ttCurrentCust)return;
-  _renderDebtBox(Number(ttCurrentCust.Cong_No||0), _getRawPayAmt());
-}
+function updatePaymentPreview(){ if(!ttCurrentCust)return; _renderDebtBox(Number(ttCurrentCust.Cong_No||0), _getRawPayAmt()); }
 function formatPayInput(el){
   const digits=el.value.replace(/\D/g,'');
   el.setAttribute('data-raw', Number(digits)||0);
   if(el.value!==digits) { el.value=digits; el.setSelectionRange(digits.length,digits.length); }
   updatePaymentPreview();
 }
-function formatPayInputOnBlur(el){
-  const num=Number(el.getAttribute('data-raw'))||0;
-  el.value=num>0?num.toLocaleString('vi-VN'):'';
-}
+function formatPayInputOnBlur(el){ const num=Number(el.getAttribute('data-raw'))||0; el.value=num>0?num.toLocaleString('vi-VN'):''; }
 function _getRawPayAmt(){ return Number(document.getElementById('ttPayInp').getAttribute('data-raw'))||0; }
-function _setRawPayAmt(val){
-  const inp=document.getElementById('ttPayInp');
-  inp.setAttribute('data-raw',val);
-  inp.value=val>0?val.toLocaleString('vi-VN'):'';
-  updatePaymentPreview();
-}
+function _setRawPayAmt(val){ const inp=document.getElementById('ttPayInp'); inp.setAttribute('data-raw',val); inp.value=val>0?val.toLocaleString('vi-VN'):''; updatePaymentPreview(); }
 function quickFill(amt){ _setRawPayAmt(amt); }
 function fillFullDebt(){
   if(!ttCurrentCust)return;
@@ -3074,6 +2938,7 @@ function fillFullDebt(){
 }
 
 function thanhToanCongNo(){
+  if (!isAdminRole()) return;
   if(!ttCurrentCust){alert("Vui lòng chọn khách hàng!");return;}
   const debt=Number(ttCurrentCust.Cong_No||0);
   const payAmt=_getRawPayAmt();
@@ -3102,10 +2967,11 @@ function thanhToanCongNo(){
   }).updateCustomerDebt(ttCurrentCust.Ten_Khach,newDebt);
 }
 
-// ===== LỊCH SỬ THANH TOÁN =====
+// ===== LỊCH SỬ THANH TOÁN (CHỈ ADMIN) =====
 let lsttDateMode = 'all';
 
 function loadAllPaymentHistory() {
+  if (!isAdminRole()) return;
   const container = document.getElementById('lsttAllHistoryContainer');
   if(container) container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)"><i class="fas fa-spinner fa-spin fa-2x"></i><div style="margin-top:10px;font-weight:600">Đang tải lịch sử giao dịch...</div></div>';
   google.script.run.withSuccessHandler(data => {
@@ -3147,7 +3013,7 @@ function checkLsttDate(timeMs) {
 }
 
 function renderAllLichSuThanhToan() {
-  if(!db.allPaymentHistory) return;
+  if (!isAdminRole() || !db.allPaymentHistory) return;
   const searchVal = (document.getElementById('lsttSearchGlobalInp').value || '').toLowerCase().trim();
   let totalThu = 0, count = 0, html = '', latestConLaiMap = {};
 
@@ -3186,9 +3052,9 @@ function renderAllLichSuThanhToan() {
   document.getElementById('lsttAllHistoryContainer').innerHTML = html;
 }
 
-// ===== LỊCH SỬ CÔNG NỢ =====
+// ===== LỊCH SỬ CÔNG NỢ (CHỈ ADMIN) =====
 function renderCongNoList(){
-  if(!db.customers)return;
+  if (!isAdminRole() || !db.customers) return;
   const term = document.getElementById('searchCongNo').value.toLowerCase().trim();
   const allDebtors = db.customers.filter(c => Number(c.Cong_No||0) !== 0);
   const debtors = allDebtors.filter(c => Number(c.Cong_No||0) > 0);
@@ -3224,7 +3090,7 @@ function renderCongNoList(){
   document.getElementById('congNoPagination').innerHTML='<button class="btn2 btn-out btn-sm2" onclick="currentCongNoPage--;renderCongNoList()"'+(currentCongNoPage<=1?' disabled':'')+'>⬅ Trước</button><span style="font-size:12px;color:var(--muted);font-weight:600">Trang '+(totalPage?currentCongNoPage:0)+' / '+totalPage+'</span><button class="btn2 btn-out btn-sm2" onclick="currentCongNoPage++;renderCongNoList()"'+(currentCongNoPage>=totalPage?' disabled':'')+'>Sau ➡</button>';
 }
 
-function goToThanhToan(custName) { showPage('thanhToan'); selectThanhToanCust(custName); }
+function goToThanhToan(custName) { if (!isAdminRole()) return; showPage('thanhToan'); selectThanhToanCust(custName); }
 
 // ==================== LƯU TẠM ĐƠN HÀNG ====================
 let _draftsCache = null;
@@ -3248,7 +3114,7 @@ function clearCartAndDraftState() {
   const banner = document.getElementById('draftActiveBanner'); if(banner) banner.style.display = 'none';
   selectedAddr = "";
   const addrEl = document.getElementById('addrDisplay'); if(addrEl) addrEl.style.display = 'none';
-  const debtH = document.getElementById('debtH'); if(debtH) debtH.textContent = '0đ';
+  const debtH = document.getElementById('debtH'); if(debtH) debtH.textContent = isStaffOrLeaderRole() ? '—' : '0đ';
   adminSelectedSale = null;
   const adminSaleSel = document.getElementById('adminSaleSelect'); if(adminSaleSel) adminSaleSel.value = '';
   const adminSalePhone = document.getElementById('adminSalePhone'); if(adminSalePhone) adminSalePhone.textContent = '';
@@ -3286,7 +3152,7 @@ function saveDraft() {
 function renderDraftsPage() {
   const b = document.getElementById('draftsPageList');
   if(!b) return;
-  const isAdmin = (user.role||'').toLowerCase() === 'admin';
+  const isAdmin = isAdminRole();
   b.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)"><i class="fas fa-spinner fa-spin" style="font-size:24px"></i><div style="margin-top:10px">Đang tải đơn lưu tạm...</div></div>';
 
   if (isAdmin) {
@@ -3354,6 +3220,7 @@ function _buildDraftCard(d, isAdminView) {
 }
 
 function adminDeleteDraft(id, saleName) {
+  if (!isAdminRole()) return;
   appConfirm('Xóa toa tạm này của sale ' + saleName + '?', () => {
     google.script.run.withSuccessHandler(() => { appToast('Đã xóa toa tạm!'); renderDraftsPage(); }).deleteDraftFromSheet(saleName, id);
   });
@@ -3422,6 +3289,7 @@ function cancelDraft() {
 }
 
 function searchAndOpenOrder() {
+  if (!isAdminRole()) return;
   const inp = document.getElementById('xlSearchIdInp');
   let val = inp.value.trim(); 
   if (!val) { appAlert("Vui lòng nhập số hóa đơn cần xử lý!", "warning"); return; }
@@ -3431,7 +3299,7 @@ function searchAndOpenOrder() {
   else appAlert("Không tìm thấy hóa đơn: " + searchId, "error");
 }
 
-// ===== LOẠI TRỪ GỘP ĐƠN =====
+// ===== LOẠI TRỪ GỘP ĐƠN (CHỈ ADMIN) =====
 let _excludeList = [];
 
 function updateExcludeBtnState() {
@@ -3446,6 +3314,7 @@ function updateExcludeBtnState() {
 }
 
 function toggleExcludeMerge(el) {
+  if (!isAdminRole()) return;
   const isOn = el.checked;
   el.disabled = true;
   google.script.run
@@ -3455,7 +3324,7 @@ function toggleExcludeMerge(el) {
 }
 
 function openExcludeModal() {
-  if (!db.excludeMerge) return;
+  if (!isAdminRole() || !db.excludeMerge) return;
   document.getElementById('excludeProdDl').innerHTML = (db.products || []).map(p => '<option value="' + String(p.Ten_San_Pham).replace(/"/g, '&quot;') + '">').join('');
   document.getElementById('excludeInp').value = '';
   document.getElementById('excludeListWrap').innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)"><i class="fas fa-spinner fa-spin"></i> Đang tải...</div>';
@@ -3474,6 +3343,7 @@ function renderExcludeList() {
 }
 
 function addExcludeItem() {
+  if (!isAdminRole()) return;
   const inp = document.getElementById('excludeInp');
   const val = inp.value.trim();
   if (!val) { appAlert("Vui lòng nhập tên sản phẩm!", "warning"); return; }
@@ -3486,6 +3356,7 @@ function addExcludeItem() {
 }
 
 function removeExcludeItem(idx) {
+  if (!isAdminRole()) return;
   const name = _excludeList[idx];
   if (!name) return;
   appConfirm('Xóa "' + name + '" khỏi danh sách loại trừ?', () => {
