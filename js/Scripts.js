@@ -1,30 +1,4 @@
 // ===== SWEETALERT2 HELPERS - GIAO DIỆN HIỆN ĐẠI =====
-const PAGE_SIZE = 20;
-let currentPage = 1;
-
-function getPagedData(list, page = 1) {
-  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
-  const safePage = Math.min(Math.max(1, page), totalPages);
-  const start = (safePage - 1) * PAGE_SIZE;
-  return {
-    items: list.slice(start, start + PAGE_SIZE),
-    page: safePage,
-    totalPages,
-    totalItems: list.length,
-  };
-}
-
-const appAlert = (msg, type = 'info') => {
-  Swal.fire({
-    text: msg,
-    icon: type, // 'success', 'error', 'warning', 'info'
-    confirmButtonColor: '#1a56db',
-    confirmButtonText: 'OK',
-    width: '320px',
-    customClass: { popup: 'rounded-4' }
-  });
-};
-
 const appToast = (msg, type = 'success') => {
   Swal.fire({
     toast: true,
