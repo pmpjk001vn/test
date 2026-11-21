@@ -19,7 +19,6 @@ function searchBaoHanh(){
 }
 
 function addBhCart(n){
-  // Thêm thuộc tính daBH: false (mặc định chưa tick)
   bhCart.unshift({Ten_Hang:n, SL:1, daBH: false});
   document.getElementById('bhSearchP').value=""; 
   document.getElementById('bhResP').innerHTML=""; 
@@ -67,29 +66,31 @@ function submitBaoHanh(){
     items: bhCart
   });
 }
+
 // ====================================================
 // ===== LỊCH SỬ BẢO HÀNH KHÔNG BÁN ĐƯỢC (DẠNG BẢNG) =====
 // ====================================================
 
 function loadLsBHKBD() {
-  document.getElementById('tblLsBHKBD').innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;"><i class="fas fa-spinner fa-spin me-2"></i>Đang tải dữ liệu...</td></tr>';
+  document.getElementById('tblLsBHKBD').innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;"><i class="fas fa-spinner fa-spin me-2"></i>Đang tải dữ liệu...</td></tr>';
   
   google.script.run.withSuccessHandler(renderLsBHKBD).withFailureHandler(err => {
-    document.getElementById('tblLsBHKBD').innerHTML = `<tr><td colspan="6" style="text-align:center; color:red; padding: 20px;">Lỗi: ${err.message}</td></tr>`;
+    document.getElementById('tblLsBHKBD').innerHTML = `<tr><td colspan="8" style="text-align:center; color:red; padding: 20px;">Lỗi: ${err.message}</td></tr>`;
   }).getLsBHKBD();
 }
 
 function renderLsBHKBD(data) {
   if (!data || data.length === 0) {
-    document.getElementById('tblLsBHKBD').innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px; color:var(--muted);">Chưa có dữ liệu lịch sử nào.</td></tr>';
+    document.getElementById('tblLsBHKBD').innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px; color:var(--muted);">Chưa có dữ liệu lịch sử nào.</td></tr>';
     return;
   }
   
   let html = '';
-  data.forEach((r, idx) => {
+  data.forEach((r) => {
     let badgeStyle = r.status === 'Đã Bảo Hành' 
       ? 'background:#059669; color:#fff; padding:4px 8px; border-radius:12px; font-size:11px; white-space:nowrap;' 
       : 'background:#d97706; color:#fff; padding:4px 8px; border-radius:12px; font-size:11px; white-space:nowrap;';
+    const safeName = (r.name || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
     html += `<tr>
       <td style="padding:10px 8px; border:1px solid #e5e7eb; text-align:center; font-weight:600; white-space:nowrap;">${r.id}</td>
@@ -97,12 +98,12 @@ function renderLsBHKBD(data) {
       <td style="padding:10px 8px; border:1px solid #e5e7eb; color:var(--pri-dk); font-weight:500; white-space:nowrap;">${r.customer}</td>
       <td style="padding:10px 8px; border:1px solid #e5e7eb; color:var(--dark);">${r.name}</td>
       <td style="padding:10px 8px; border:1px solid #e5e7eb; text-align:center; font-weight:bold;">${r.qty}</td>
-      <td style="padding:10px 8px; border:1px solid #e5e7eb; font-style:italic;">${r.note}</td>
+      <td style="padding:10px 8px; border:1px solid #e5e7eb; font-style:italic;">${r.note || ''}</td>
       <td style="padding:10px 8px; border:1px solid #e5e7eb; text-align:center; white-space:nowrap;">
         <span style="${badgeStyle}">${r.status}</span>
       </td>
       <td style="padding:6px 8px; border:1px solid #e5e7eb; text-align:center;">
-        <button onclick="deleteBHKBDRow('${r.id}', '${r.name.replace(/'/g,"\\'")}', this)"
+        <button onclick="deleteBHKBDRow('${r.id}', '${safeName}', this)"
           style="background:#ef4444; color:#fff; border:none; border-radius:8px; width:28px; height:28px; font-size:16px; line-height:1; cursor:pointer; font-weight:bold;"
           title="Xóa dòng này">×</button>
       </td>
@@ -119,7 +120,7 @@ function deleteBHKBDRow(maHD, tenSP, btn) {
   google.script.run
     .withSuccessHandler(() => {
       appToast('Đã xóa thành công!');
-      loadLsBHKBD(); // Tải lại bảng
+      loadLsBHKBD();
     })
     .withFailureHandler(err => {
       appAlert('Lỗi xóa: ' + err.message, 'danger');
@@ -128,6 +129,7 @@ function deleteBHKBDRow(maHD, tenSP, btn) {
     })
     .deleteBHKBDRow(maHD, tenSP);
 }
+
 // ====================================================
 // ===== MODULE BẢO HÀNH HÀNG BÁN ĐƯỢC (CỘNG KHO) =====
 // ====================================================
@@ -181,25 +183,25 @@ function submitBaoHanhBD(){
 }
 
 function loadLsBHBD() {
-  document.getElementById('tblLsBHBD').innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;"><i class="fas fa-spinner fa-spin me-2"></i>Đang tải...</td></tr>';
+  document.getElementById('tblLsBHBD').innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px;"><i class="fas fa-spinner fa-spin me-2"></i>Đang tải...</td></tr>';
   google.script.run
     .withSuccessHandler(renderLsBHBD)
     .withFailureHandler(err => {
-      document.getElementById('tblLsBHBD').innerHTML = `<tr><td colspan="7" style="text-align:center; color:red; padding:20px;">Lỗi: ${err.message}</td></tr>`;
+      document.getElementById('tblLsBHBD').innerHTML = `<tr><td colspan="8" style="text-align:center; color:red; padding:20px;">Lỗi: ${err.message}</td></tr>`;
     })
     .getLsBHBD();
 }
 
 function renderLsBHBD(data) {
   if (!data || !data.length) {
-    document.getElementById('tblLsBHBD').innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--muted);">Trống</td></tr>';
+    document.getElementById('tblLsBHBD').innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--muted);">Trống</td></tr>';
     return;
   }
   let html = data.map(r => {
     let badge = r.status === 'Đã Bảo Hành'
       ? 'background:#059669; color:#fff; padding:4px 8px; border-radius:12px; font-size:11px; white-space:nowrap;'
       : 'background:#d97706; color:#fff; padding:4px 8px; border-radius:12px; font-size:11px; white-space:nowrap;';
-    const safeName = (r.name || '').replace(/'/g, "\\'");
+    const safeName = (r.name || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, '&quot;');
     return `<tr>
       <td style="padding:10px 8px; border:1px solid #e5e7eb; text-align:center; font-weight:600; white-space:nowrap;">${r.id}</td>
       <td style="padding:10px 8px; border:1px solid #e5e7eb; text-align:center; white-space:nowrap;">${r.date}</td>
@@ -236,11 +238,13 @@ function deleteBHBDRow(maHD, tenSP, btn) {
     })
     .deleteBHBDRow(maHD, tenSP);
 }
-// Hàm gọi dữ liệu máy chủ và xuất tệp Excel tự co giãn cột chuẩn, kẻ khung đậm rõ nét
+
+// ====================================================
+// ===== XUẤT EXCEL DANH MỤC SẢN PHẨM =================
+// ====================================================
 function downloadProductsExcel() {
   appToast("Đang kết nối máy chủ để tải tệp gốc...", "info");
   
-  // Gọi hàm ngầm trên máy chủ Google Sheet
   google.script.run
     .withSuccessHandler(function(rawData) {
       if (!rawData || rawData.length === 0) {
@@ -248,10 +252,7 @@ function downloadProductsExcel() {
         return;
       }
       
-      // Hàng số 0 chính là tiêu đề danh mục gốc của bạn
       const headers = rawData[0];
-      
-      // FIX VIỀN MỜ: Đổi mã màu từ #A0AEC0 sang #000000 (Đen) để viền khung đậm và rõ nét 100%
       const borderXML = 
         '  <Borders>' +
         '    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>' +
@@ -260,7 +261,6 @@ function downloadProductsExcel() {
         '    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/>' +
         '  </Borders>';
       
-      // Dựng cấu trúc XML bảng biểu chuẩn Microsoft Excel
       let xml = '<?xml version="1.0" encoding="utf-8"?>' +
                 '<?mso-application progid="Excel.Sheet"?>' +
                 '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" ' +
@@ -270,68 +270,53 @@ function downloadProductsExcel() {
                 'xmlns:html="http://www.w3.org/TR/REC-html40">' +
                 '<Styles>' +
                 '<Style ss:ID="Default"><Font ss:FontName="Segoe UI" ss:Size="11" ss:Color="#111827"/></Style>' +
-                
-                // Style cho tiêu đề (Màu xanh dương đậm, chữ trắng in đậm, có kẻ viền đậm)
                 '<Style ss:ID="HeaderStyle">' +
                 '  <Font ss:FontName="Segoe UI" ss:Size="11" ss:Bold="1" ss:Color="#FFFFFF"/>' +
                 '  <Interior ss:Color="#1A56DB" ss:Pattern="Solid"/>' +
                 '  <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>' +
                 borderXML +
                 '</Style>' +
-                
-                // Style cho văn bản canh trái (Tên sản phẩm)
                 '<Style ss:ID="TextLeft">' +
                 '  <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>' +
                 borderXML +
                 '</Style>' +
-                
-                // Style cho Mã SP canh giữa, chữ đậm
                 '<Style ss:ID="TextCenter">' +
                 '  <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>' +
                 '  <Font ss:FontName="Segoe UI" ss:Bold="1"/>' +
                 borderXML +
                 '</Style>' +
-                
-                // Style định dạng số cho các cột số (Thu gọn canh phải, phân tách phần ngàn)
                 '<Style ss:ID="NumberRight">' +
                 '  <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>' +
                 '  <NumberFormat ss:Format="#,##0"/>' +
                 borderXML +
                 '</Style>' +
                 '</Styles>' +
-                
                 '<Worksheet ss:Name="Danh Mục Sản Phẩm">' +
                 '<Table>';
       
-      // KIỂM TRA ĐỘ RỘNG CỘT THÔNG MINH: Tên sản phẩm siêu rộng, cột số thu gọn khít 6-7 chữ số
       headers.forEach((h, idx) => {
         let headerName = String(h).toLowerCase();
         if (headerName.includes("tên") || headerName.includes("san_pham") || headerName.includes("sản phẩm")) {
-          xml += '<Column ss:Width="320"/>'; // Cột tên sản phẩm kéo rộng hẳn ra để xem toàn bộ tên
+          xml += '<Column ss:Width="320"/>';
         } else if (idx === 0 || headerName.includes("mã")) {
-          xml += '<Column ss:Width="85"/>';  // Cột Mã SP vừa vặn
+          xml += '<Column ss:Width="85"/>';
         } else {
-          xml += '<Column ss:Width="75"/>';  // Tất cả các cột số thu gọn lại vừa khít 6 chữ số gọn gàng
+          xml += '<Column ss:Width="75"/>';
         }
       });
       
-      // Đổ dòng tiêu đề vào bảng
       xml += '<Row ss:Height="26">';
       headers.forEach(h => {
         xml += `<Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">${h}</Data></Cell>`;
       });
       xml += '</Row>';
       
-      // Đổ toàn bộ các dòng dữ liệu
       for (let i = 1; i < rawData.length; i++) {
-        // Bỏ qua nếu dòng đó trống trơn không có dữ liệu
         if (!rawData[i] || rawData[i].join("").trim() === "") continue;
 
         xml += '<Row ss:Height="22">';
         rawData[i].forEach((cellValue, colIdx) => {
           let hName = String(headers[colIdx] || "").toLowerCase();
-          
-          // Nếu ô là số và không phải cột Mã hoặc cột Tên
           if (typeof cellValue === 'number' && !hName.includes("tên") && !hName.includes("mã") && colIdx !== 0) {
             xml += `<Cell ss:StyleID="NumberRight"><Data ss:Type="Number">${cellValue}</Data></Cell>`;
           } else {
@@ -342,17 +327,15 @@ function downloadProductsExcel() {
         xml += '</Row>';
       }
       
-      // Bắt buộc Excel hiển thị khung viền lưới phân chia các hàng rõ rệt
       xml += '</Table>' +
              '<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">' +
              '  <Selected/>' +
              '  <ProtectObjects>False</ProtectObjects>' +
              '  <ProtectScenarios>False</ProtectScenarios>' +
-             '  <DisplayGridLines/>' + // Hiển thị đường lưới viền hàng
+             '  <DisplayGridLines/>' +
              '</WorksheetOptions>' +
              '</Worksheet></Workbook>';
       
-      // Tiến hành xuất dữ liệu ra tệp
       const blob = new Blob([xml], { type: "application/vnd.ms-excel;charset=utf-8;" });
       const link = document.createElement("a");
       const url = URL.createObjectURL(blob);
@@ -371,11 +354,12 @@ function downloadProductsExcel() {
     })
     .getRawExcelData();
 }
-// ===== XỬ LÝ CÀI ĐẶT HÓA ĐƠN =====
 
-// Hàm mở Modal Cài đặt
+// ==========================================
+// CÀI ĐẶT GIAO DIỆN HÓA ĐƠN & LIVE PREVIEW
+// ==========================================
+
 function openInvoiceSettings() {
-  // Lấy dữ liệu cũ hiển thị lên Form
   document.getElementById('set_inv_logo').value = localStorage.getItem('inv_logo_url') || '';
   document.getElementById('set_inv_logo_w').value = localStorage.getItem('inv_logo_width') || '120';
   document.getElementById('set_inv_logo_h').value = localStorage.getItem('inv_logo_height') || '50';
@@ -385,10 +369,6 @@ function openInvoiceSettings() {
   const modal = new bootstrap.Modal(document.getElementById('modalInvoiceSettings'));
   modal.show();
 }
-
-// ==========================================
-// CÀI ĐẶT GIAO DIỆN HÓA ĐƠN & LIVE PREVIEW (LƯU MÁY CHỦ)
-// ==========================================
 
 const INVOICE_SETTINGS_KEYS = [
   'is_logoUrl', 'is_logoW', 'is_logoH',
@@ -405,25 +385,21 @@ const INVOICE_SETTINGS_KEYS = [
 
 let previewEventsAttached = false;
 
-// 1. KÉO DỮ LIỆU TỪ GOOGLE SHEETS VỀ MÁY KHI VỪA MỞ WEB LÊN
 document.addEventListener("DOMContentLoaded", function() {
   google.script.run
     .withSuccessHandler((jsonStr) => {
       if(jsonStr) {
         try {
           const config = JSON.parse(jsonStr);
-          // Áp dụng dữ liệu máy chủ vào trình duyệt hiện tại
           for(let key in config) {
             localStorage.setItem(key, config[key]);
           }
-          console.log("✅ Đã đồng bộ cài đặt hóa đơn từ Server!");
         } catch(e){}
       }
     })
     .loadInvoiceConfig();
 });
 
-// 2. MỞ BẢNG CÀI ĐẶT VÀ GẮN DỮ LIỆU VÀO FORM
 function openInvoiceSettingsModal() {
   INVOICE_SETTINGS_KEYS.forEach(key => {
     const val = localStorage.getItem(key);
@@ -455,32 +431,24 @@ function closeInvoiceSettingsModal() {
   document.getElementById('invoiceSettingsModal').style.display = 'none';
 }
 
-// 3. NÚT LƯU CÀI ĐẶT (ĐẨY DỮ LIỆU LÊN GOOGLE SHEETS VĨNH VIỄN)
 function saveInvoiceSettings() {
   let config = {};
   
   INVOICE_SETTINGS_KEYS.forEach(key => {
     const el = document.getElementById(key);
     if (el) {
-      localStorage.setItem(key, el.value); // Lưu tạm ở máy
-      config[key] = el.value;              // Gom dữ liệu để chuẩn bị gửi
+      localStorage.setItem(key, el.value);
+      config[key] = el.value;
     }
   });
   
   closeInvoiceSettingsModal();
+  if (typeof appToast === 'function') appToast("Đang đồng bộ cài đặt lên hệ thống...");
   
-  if (typeof appToast === 'function') {
-    appToast("Đang đồng bộ cài đặt lên hệ thống...");
-  }
-  
-  // Gửi lệnh lên máy chủ
   google.script.run
     .withSuccessHandler(() => {
-      if (typeof appToast === 'function') {
-        appToast("✅ Đã lưu cài đặt vĩnh viễn thành công!");
-      } else {
-        alert("Đã lưu cài đặt vĩnh viễn trên toàn hệ thống!");
-      }
+      if (typeof appToast === 'function') appToast("✅ Đã lưu cài đặt vĩnh viễn thành công!");
+      else alert("Đã lưu cài đặt vĩnh viễn trên toàn hệ thống!");
     })
     .withFailureHandler(() => {
       alert("⚠️ Lỗi: Không thể lưu lên máy chủ, vui lòng kiểm tra mạng.");
@@ -488,7 +456,6 @@ function saveInvoiceSettings() {
     .saveInvoiceConfig(JSON.stringify(config));
 }
 
-// 4. RESET VỀ MẶC ĐỊNH
 function resetInvoiceSettings() {
   if(!confirm("Bạn có chắc muốn đặt lại toàn bộ thiết kế về mặc định?")) return;
   INVOICE_SETTINGS_KEYS.forEach(key => localStorage.removeItem(key));
@@ -496,7 +463,6 @@ function resetInvoiceSettings() {
   if (typeof appToast === 'function') appToast("Đã khôi phục mặc định.");
 }
 
-// 5. HÀM CẬP NHẬT GIAO DIỆN XEM TRƯỚC (BẮT BUỘC PHẢI CÓ ĐỂ XEM TRƯỚC HOẠT ĐỘNG)
 function updateInvoicePreview() {
   const config = {};
   INVOICE_SETTINGS_KEYS.forEach(key => {
@@ -511,7 +477,6 @@ function updateInvoicePreview() {
   ];
   
   const html = buildInvoiceHTML(dummyO, dummyItems, 0, 'Giao hàng trong ngày', '0901234567', '0987654321', 0, 0, config);
-
   const padTB = config['is_padTB'] || '12';
   const padLR = config['is_padLR'] || '15';
 
@@ -519,18 +484,17 @@ function updateInvoicePreview() {
   if (iframe) {
     const doc = iframe.contentWindow.document;
     doc.open();
-    
     let previewHtml = html.replace('</head>', `
       <style>
         @media screen {
           html { background: transparent; display: flex; justify-content: center; padding: 20px 0; }
           body { 
-            width: 148mm !important; 
-            min-height: 210mm !important; 
+            width: 148mm !important;
+            min-height: 210mm !important;
             margin: 0 !important; 
             padding: ${padTB}mm ${padLR}mm !important; 
             box-sizing: border-box !important;
-            box-shadow: 0 5px 25px rgba(0,0,0,0.6) !important; 
+            box-shadow: 0 5px 25px rgba(0,0,0,0.6) !important;
             background: #fff;
             transform-origin: top center;
             transform: scale(0.95);
@@ -539,76 +503,11 @@ function updateInvoicePreview() {
       </style>
       </head>
     `);
-    
     doc.write(previewHtml);
     doc.close();
   }
 }
 
-// HÀM VẼ GIAO DIỆN PREVIEW
-function updateInvoicePreview() {
-  // Thu thập cấu hình hiện tại từ Form
-  const config = {};
-  INVOICE_SETTINGS_KEYS.forEach(key => {
-    const el = document.getElementById(key);
-    if (el) config[key] = el.value;
-  });
-
-  // Tạo data giả để xem trước
-  const dummyO = { id: 'HD_MẪU', cust: 'CÔNG TY KHÁCH HÀNG MẪU', sale: 'Nhân viên 1', addr: 'Số 1, Phường 2, Cần Thơ' };
-  const dummyItems = [
-    { Ten_Hang: 'Sản phẩm thử nghiệm (Tên rất dài để xem tự động ngắt dòng)', SL: 10, Gia: 150000, CK: 5, Ghi_Chu: '' },
-    { Ten_Hang: 'Sản phẩm thứ hai', SL: 2, Gia: 300000, CK: 0, Ghi_Chu: 'VIP' }
-  ];
-  
-  // Dùng hàm buildInvoiceHTML để tạo HTML
-  const html = buildInvoiceHTML(dummyO, dummyItems, 0, 'Giao hàng trong ngày', '0901234567', '0987654321', 0, 0, config);
-
-  // Lấy ra thông số Lề (để làm phần lề trắng viền quanh tờ giấy ảo)
-  const padTB = config['is_padTB'] || '12';
-  const padLR = config['is_padLR'] || '15';
-
-  // Bắn HTML vào iframe
-  const iframe = document.getElementById('invoicePreviewFrame');
-  if (iframe) {
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    
-    // --- CHỈNH SỬA CSS TRONG PREVIEW ĐỂ ÉP THÀNH KHUNG GIẤY A5 ---
-    let previewHtml = html.replace('</head>', `
-      <style>
-        @media screen {
-          /* Biến background ngoài viền thành màu xám (trong suốt để tệp với cột phải) */
-          html { 
-            background: transparent; 
-            display: flex; 
-            justify-content: center; 
-            padding: 20px 0; 
-          }
-          /* Tạo hình dáng tờ giấy A5 */
-          body { 
-            width: 148mm !important;      /* Kích thước ngang chuẩn A5 */
-            min-height: 210mm !important; /* Kích thước dọc chuẩn A5 */
-            margin: 0 !important; 
-            /* Lấy đúng cài đặt lề của bạn ép thành padding tờ giấy */
-            padding: ${padTB}mm ${padLR}mm !important; 
-            box-sizing: border-box !important;
-            box-shadow: 0 5px 25px rgba(0,0,0,0.6) !important; /* Đổ bóng tờ giấy */
-            background: #fff;
-            
-            /* Thu nhỏ một xíu để nhìn tổng quan tờ giấy mượt hơn */
-            transform-origin: top center;
-            transform: scale(0.95);
-          }
-        }
-      </style>
-      </head>
-    `);
-    
-    doc.write(previewHtml);
-    doc.close();
-  }
-}
 // ===== GỢI Ý KHÁCH HÀNG DÙNG CHUNG CHO BH/BHBD =====
 function searchCustSuggest(inputEl, suggestDivId) {
   const v = bodau(inputEl.value.trim());
@@ -637,7 +536,6 @@ function searchCustSuggest(inputEl, suggestDivId) {
   '</div>';
 }
 
-// Đóng dropdown khi click ra ngoài
 document.addEventListener('click', function(e) {
   ['bhCustSuggestions', 'bhBDCustSuggestions'].forEach(function(id) {
     const box = document.getElementById(id);
@@ -647,169 +545,154 @@ document.addEventListener('click', function(e) {
     }
   });
 });
+
 // =========================================================================
-// MODULE TÌM KIẾM & PHÂN TRANG LỊCH SỬ BẢO HÀNH (15 DÒNG/TRANG)
+// MODULE TÌM KIẾM & PHÂN TRANG LỊCH SỬ BẢO HÀNH (20 DÒNG/TRANG)
 // =========================================================================
 
 let globalDataLsBHKBD = [];
 let globalDataLsBHBD = [];
-
-// Khởi tạo biến trang hiện tại và số dòng mỗi trang
 let currentPageBHKBD = 1;
 let currentPageBHBD = 1;
-const BH_ITEMS_PER_PAGE = 15;
+const BH_ITEMS_PER_PAGE = 20;
 
-// -------------------------------------------------------------------------
-// HÀM VẼ UI PHÂN TRANG (DÙNG CHUNG)
-// -------------------------------------------------------------------------
 function drawBaoHanhPagination(totalPages, current, containerId, tableId, callback, activeColor) {
-    let pagContainer = document.getElementById(containerId);
-    if (!pagContainer) {
-        pagContainer = document.createElement('div');
-        pagContainer.id = containerId;
-        pagContainer.style.cssText = "display:flex; justify-content:center; align-items:center; gap:6px; margin-top:16px; padding-bottom:10px; flex-wrap:wrap;";
-        document.getElementById(tableId).parentElement.parentElement.appendChild(pagContainer);
-    }
-    
-    if (totalPages <= 1) {
-        pagContainer.innerHTML = '';
-        return;
-    }
-    
-    let html = '';
-    for (let i = 1; i <= totalPages; i++) {
-        let activeStyle = i === current 
-            ? `background:${activeColor}; color:#fff; border-color:${activeColor}; box-shadow:0 2px 4px rgba(0,0,0,0.1);` 
-            : 'background:#fff; color:var(--muted); border-color:#cbd5e1;';
-        html += `<button class="pag-btn-${containerId}" data-page="${i}" style="padding:6px 14px; border-radius:6px; border:1px solid; cursor:pointer; font-weight:bold; font-size:12px; transition:0.2s; ${activeStyle}">${i}</button>`;
-    }
-    pagContainer.innerHTML = html;
+  let pagContainer = document.getElementById(containerId);
+  if (!pagContainer) {
+    pagContainer = document.createElement('div');
+    pagContainer.id = containerId;
+    pagContainer.style.cssText = "display:flex; justify-content:center; align-items:center; gap:6px; margin-top:16px; padding-bottom:10px; flex-wrap:wrap;";
+    document.getElementById(tableId).parentElement.parentElement.appendChild(pagContainer);
+  }
+  
+  if (totalPages <= 1) {
+    pagContainer.innerHTML = '';
+    return;
+  }
+  
+  let html = '';
+  for (let i = 1; i <= totalPages; i++) {
+    let activeStyle = i === current 
+      ? `background:${activeColor}; color:#fff; border-color:${activeColor}; box-shadow:0 2px 4px rgba(0,0,0,0.1);` 
+      : 'background:#fff; color:var(--muted); border-color:#cbd5e1;';
+    html += `<button class="pag-btn-${containerId}" data-page="${i}" style="padding:6px 14px; border-radius:6px; border:1px solid; cursor:pointer; font-weight:bold; font-size:12px; transition:0.2s; ${activeStyle}">${i}</button>`;
+  }
+  pagContainer.innerHTML = html;
 
-    // Gắn sự kiện click chuyển trang
-    document.querySelectorAll(`.pag-btn-${containerId}`).forEach(btn => {
-        btn.onclick = function() {
-            callback(parseInt(this.getAttribute('data-page')));
-            // Cuộn lên đầu bảng mượt mà sau khi chuyển trang
-            const tableTop = document.getElementById(tableId).parentElement.parentElement.offsetTop;
-            window.scrollTo({ top: tableTop - 120, behavior: 'smooth' });
-        };
-    });
+  document.querySelectorAll(`.pag-btn-${containerId}`).forEach(btn => {
+    btn.onclick = function() {
+      callback(parseInt(this.getAttribute('data-page')));
+      const tableTop = document.getElementById(tableId).parentElement.parentElement.offsetTop;
+      window.scrollTo({ top: tableTop - 120, behavior: 'smooth' });
+    };
+  });
 }
 
-// -------------------------------------------------------------------------
 // 1. TÌM KIẾM & PHÂN TRANG BẢNG: KHÔNG BÁN ĐƯỢC
-// -------------------------------------------------------------------------
 const originalRenderLsBHKBD = renderLsBHKBD;
 renderLsBHKBD = function(data, isFiltering = false) {
-    if (!isFiltering) {
-        globalDataLsBHKBD = data || []; 
-        currentPageBHKBD = 1; // Load mới thì reset về trang 1
-    }
-    let displayData = isFiltering ? data : globalDataLsBHKBD;
-    
-    // Tính toán phân trang
-    const totalPages = Math.ceil(displayData.length / BH_ITEMS_PER_PAGE);
-    if (currentPageBHKBD > totalPages) currentPageBHKBD = totalPages;
-    if (currentPageBHKBD < 1) currentPageBHKBD = 1;
-    
-    // Cắt 15 dòng
-    const startIndex = (currentPageBHKBD - 1) * BH_ITEMS_PER_PAGE;
-    const pagedData = displayData.slice(startIndex, startIndex + BH_ITEMS_PER_PAGE);
-    
-    originalRenderLsBHKBD(pagedData); // Gọi render gốc chỉ vẽ 15 dòng
-    
-    // Vẽ nút phân trang (Dùng màu Xanh dương --info)
-    drawBaoHanhPagination(totalPages, currentPageBHKBD, 'pagLsBHKBD', 'tblLsBHKBD', function(page) {
-        currentPageBHKBD = page;
-        const kw = document.getElementById('filterLsBHKBDInp').value;
-        renderLsBHKBD(kw ? globalDataLsBHKBD.filter(r => bodau(r.name).includes(bodau(kw))) : globalDataLsBHKBD, true);
-    }, 'var(--info)');
+  if (!isFiltering) {
+    globalDataLsBHKBD = data || []; 
+    currentPageBHKBD = 1;
+  }
+  let displayData = isFiltering ? data : globalDataLsBHKBD;
+  
+  const totalPages = Math.ceil(displayData.length / BH_ITEMS_PER_PAGE);
+  if (currentPageBHKBD > totalPages) currentPageBHKBD = totalPages;
+  if (currentPageBHKBD < 1) currentPageBHKBD = 1;
+  
+  const startIndex = (currentPageBHKBD - 1) * BH_ITEMS_PER_PAGE;
+  const pagedData = displayData.slice(startIndex, startIndex + BH_ITEMS_PER_PAGE);
+  
+  originalRenderLsBHKBD(pagedData);
+  
+  drawBaoHanhPagination(totalPages, currentPageBHKBD, 'pagLsBHKBD', 'tblLsBHKBD', function(page) {
+    currentPageBHKBD = page;
+    const kw = document.getElementById('filterLsBHKBDInp').value;
+    renderLsBHKBD(kw ? globalDataLsBHKBD.filter(r => bodau(r.name).includes(bodau(kw))) : globalDataLsBHKBD, true);
+  }, 'var(--info)');
 };
 
 function suggestFilterLsBHKBD(inputEl) {
-    currentPageBHKBD = 1; // Reset về trang 1 khi bắt đầu gõ lọc mới
-    const v = bodau(inputEl.value.trim());
-    const box = document.getElementById('suggestLsBHKBDBox');
-    
-    if (!v) {
-        box.innerHTML = '';
-        renderLsBHKBD(globalDataLsBHKBD, true);
-        return;
-    }
+  currentPageBHKBD = 1;
+  const v = bodau(inputEl.value.trim());
+  const box = document.getElementById('suggestLsBHKBDBox');
+  
+  if (!v) {
+    box.innerHTML = '';
+    renderLsBHKBD(globalDataLsBHKBD, true);
+    return;
+  }
 
-    const matches = (db.products || []).filter(p => p.Ten_San_Pham && bodau(p.Ten_San_Pham).includes(v)).slice(0, 20);
-    box.innerHTML = matches.length ? '<div class="search-res" style="max-height: 250px; overflow-y: auto; border:none;">' +
-        matches.map(p => `<div class="sr-item" onmousedown="event.preventDefault(); applyFilterLsBHKBD('${(p.Ten_San_Pham || '').replace(/'/g, "\\'").replace(/"/g, '\\"')}')"><span><strong>${p.Ten_San_Pham}</strong></span></div>`).join('') + '</div>' : '';
+  const matches = (db.products || []).filter(p => p.Ten_San_Pham && bodau(p.Ten_San_Pham).includes(v)).slice(0, 20);
+  box.innerHTML = matches.length ? '<div class="search-res" style="max-height: 250px; overflow-y: auto; border:none;">' +
+    matches.map(p => `<div class="sr-item" onmousedown="event.preventDefault(); applyFilterLsBHKBD('${(p.Ten_San_Pham || '').replace(/'/g, "\\'").replace(/"/g, '\\"')}')"><span><strong>${p.Ten_San_Pham}</strong></span></div>`).join('') + '</div>' : '';
 
-    renderLsBHKBD(globalDataLsBHKBD.filter(r => bodau(r.name).includes(v)), true);
+  renderLsBHKBD(globalDataLsBHKBD.filter(r => bodau(r.name).includes(v)), true);
 }
 
 function applyFilterLsBHKBD(productName) {
-    currentPageBHKBD = 1;
-    document.getElementById('filterLsBHKBDInp').value = productName;
-    document.getElementById('suggestLsBHKBDBox').innerHTML = '';
-    renderLsBHKBD(globalDataLsBHKBD.filter(r => bodau(r.name) === bodau(productName)), true);
+  currentPageBHKBD = 1;
+  document.getElementById('filterLsBHKBDInp').value = productName;
+  document.getElementById('suggestLsBHKBDBox').innerHTML = '';
+  renderLsBHKBD(globalDataLsBHKBD.filter(r => bodau(r.name) === bodau(productName)), true);
 }
 
-// -------------------------------------------------------------------------
 // 2. TÌM KIẾM & PHÂN TRANG BẢNG: BÁN ĐƯỢC
-// -------------------------------------------------------------------------
 const originalRenderLsBHBD = renderLsBHBD;
 renderLsBHBD = function(data, isFiltering = false) {
-    if (!isFiltering) {
-        globalDataLsBHBD = data || [];
-        currentPageBHBD = 1;
-    }
-    let displayData = isFiltering ? data : globalDataLsBHBD;
-    
-    const totalPages = Math.ceil(displayData.length / BH_ITEMS_PER_PAGE);
-    if (currentPageBHBD > totalPages) currentPageBHBD = totalPages;
-    if (currentPageBHBD < 1) currentPageBHBD = 1;
-    
-    const startIndex = (currentPageBHBD - 1) * BH_ITEMS_PER_PAGE;
-    const pagedData = displayData.slice(startIndex, startIndex + BH_ITEMS_PER_PAGE);
-    
-    originalRenderLsBHBD(pagedData);
-    
-    // Vẽ nút phân trang (Dùng màu Xanh lá --suc)
-    drawBaoHanhPagination(totalPages, currentPageBHBD, 'pagLsBHBD', 'tblLsBHBD', function(page) {
-        currentPageBHBD = page;
-        const kw = document.getElementById('filterLsBHBDInp').value;
-        renderLsBHBD(kw ? globalDataLsBHBD.filter(r => bodau(r.name).includes(bodau(kw))) : globalDataLsBHBD, true);
-    }, 'var(--suc)');
+  if (!isFiltering) {
+    globalDataLsBHBD = data || [];
+    currentPageBHBD = 1;
+  }
+  let displayData = isFiltering ? data : globalDataLsBHBD;
+  
+  const totalPages = Math.ceil(displayData.length / BH_ITEMS_PER_PAGE);
+  if (currentPageBHBD > totalPages) currentPageBHBD = totalPages;
+  if (currentPageBHBD < 1) currentPageBHBD = 1;
+  
+  const startIndex = (currentPageBHBD - 1) * BH_ITEMS_PER_PAGE;
+  const pagedData = displayData.slice(startIndex, startIndex + BH_ITEMS_PER_PAGE);
+  
+  originalRenderLsBHBD(pagedData);
+  
+  drawBaoHanhPagination(totalPages, currentPageBHBD, 'pagLsBHBD', 'tblLsBHBD', function(page) {
+    currentPageBHBD = page;
+    const kw = document.getElementById('filterLsBHBDInp').value;
+    renderLsBHBD(kw ? globalDataLsBHBD.filter(r => bodau(r.name).includes(bodau(kw))) : globalDataLsBHBD, true);
+  }, 'var(--suc)');
 };
 
 function suggestFilterLsBHBD(inputEl) {
-    currentPageBHBD = 1;
-    const v = bodau(inputEl.value.trim());
-    const box = document.getElementById('suggestLsBHBDBox');
-    
-    if (!v) {
-        box.innerHTML = '';
-        renderLsBHBD(globalDataLsBHBD, true);
-        return;
-    }
+  currentPageBHBD = 1;
+  const v = bodau(inputEl.value.trim());
+  const box = document.getElementById('suggestLsBHBDBox');
+  
+  if (!v) {
+    box.innerHTML = '';
+    renderLsBHBD(globalDataLsBHBD, true);
+    return;
+  }
 
-    const matches = (db.products || []).filter(p => p.Ten_San_Pham && bodau(p.Ten_San_Pham).includes(v)).slice(0, 20);
-    box.innerHTML = matches.length ? '<div class="search-res" style="max-height: 250px; overflow-y: auto; border:none;">' +
-        matches.map(p => `<div class="sr-item" onmousedown="event.preventDefault(); applyFilterLsBHBD('${(p.Ten_San_Pham || '').replace(/'/g, "\\'").replace(/"/g, '\\"')}')"><span><strong>${p.Ten_San_Pham}</strong></span></div>`).join('') + '</div>' : '';
+  const matches = (db.products || []).filter(p => p.Ten_San_Pham && bodau(p.Ten_San_Pham).includes(v)).slice(0, 20);
+  box.innerHTML = matches.length ? '<div class="search-res" style="max-height: 250px; overflow-y: auto; border:none;">' +
+    matches.map(p => `<div class="sr-item" onmousedown="event.preventDefault(); applyFilterLsBHBD('${(p.Ten_San_Pham || '').replace(/'/g, "\\'").replace(/"/g, '\\"')}')"><span><strong>${p.Ten_San_Pham}</strong></span></div>`).join('') + '</div>' : '';
 
-    renderLsBHBD(globalDataLsBHBD.filter(r => bodau(r.name).includes(v)), true);
+  renderLsBHBD(globalDataLsBHBD.filter(r => bodau(r.name).includes(v)), true);
 }
 
 function applyFilterLsBHBD(productName) {
-    currentPageBHBD = 1;
-    document.getElementById('filterLsBHBDInp').value = productName;
-    document.getElementById('suggestLsBHBDBox').innerHTML = '';
-    renderLsBHBD(globalDataLsBHBD.filter(r => bodau(r.name) === bodau(productName)), true);
+  currentPageBHBD = 1;
+  document.getElementById('filterLsBHBDInp').value = productName;
+  document.getElementById('suggestLsBHBDBox').innerHTML = '';
+  renderLsBHBD(globalDataLsBHBD.filter(r => bodau(r.name) === bodau(productName)), true);
 }
 
-// Đóng hộp gợi ý khi click ra ngoài
 document.addEventListener('click', function(e) {
-    ['suggestLsBHKBDBox', 'suggestLsBHBDBox'].forEach(id => {
-        const box = document.getElementById(id);
-        if (box && !box.contains(e.target) && e.target.id !== 'filterLsBHKBDInp' && e.target.id !== 'filterLsBHBDInp') {
-            box.innerHTML = '';
-        }
-    });
+  ['suggestLsBHKBDBox', 'suggestLsBHBDBox'].forEach(id => {
+    const box = document.getElementById(id);
+    if (box && !box.contains(e.target) && e.target.id !== 'filterLsBHKBDInp' && e.target.id !== 'filterLsBHBDInp') {
+      box.innerHTML = '';
+    }
+  });
 });
